@@ -1,0 +1,11 @@
+flask
+flask-session
+python-dotenv
+supabase
+yfinance
+requests
+openai
+reportlab
+plotly
+pandas
+gunicorn
