@@ -1,10 +1,708 @@
 {% extends "base.html" %}
-{% block title %}Portal — AdvisorNest{% endblock %}
+
+{% block title %}New Recommendation — AdvisorNest{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Portal-specific styles */
+    .portal-layout {
+        display: grid;
+        grid-template-columns: 380px 1fr;
+        gap: var(--space-xl);
+        align-items: start;
+    }
+
+    .portal-sidebar {
+        position: sticky;
+        top: 88px;
+    }
+
+    .risk-options {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: var(--space-sm);
+    }
+
+    .risk-option {
+        position: relative;
+    }
+
+    .risk-option input[type="radio"] {
+        position: absolute;
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .risk-label {
+        display: block;
+        padding: 10px var(--space-sm);
+        border: 1.5px solid var(--border);
+        border-radius: var(--radius-md);
+        text-align: center;
+        cursor: pointer;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: var(--text-secondary);
+        transition: var(--transition);
+    }
+
+    .risk-option input[type="radio"]:checked + .risk-label {
+        border-color: var(--navy);
+        background: var(--info-bg);
+        color: var(--navy);
+        font-weight: 600;
+    }
+
+    .risk-label:hover {
+        border-color: var(--navy);
+        color: var(--navy);
+    }
+
+    .allocation-bar {
+        height: 8px;
+        border-radius: 4px;
+        margin-top: 6px;
+        transition: width 0.8s ease;
+    }
+
+    .instrument-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: var(--space-md) var(--space-lg);
+        background: var(--bg-primary);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        margin-bottom: var(--space-sm);
+        transition: var(--transition);
+    }
+
+    .instrument-card:hover {
+        border-color: var(--navy);
+        background: var(--bg-secondary);
+        box-shadow: var(--shadow-sm);
+    }
+
+    .instrument-ticker {
+        font-size: 0.875rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        min-width: 60px;
+    }
+
+    .instrument-name {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        flex: 1;
+        padding: 0 var(--space-md);
+    }
+
+    .instrument-price {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        min-width: 70px;
+        text-align: right;
+    }
+
+    .instrument-detail {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        min-width: 80px;
+        text-align: right;
+    }
+
+    .live-badge {
+        font-size: 0.65rem;
+        font-weight: 700;
+        background: var(--success-bg);
+        color: var(--success);
+        border: 1px solid #c6f6d5;
+        border-radius: 4px;
+        padding: 1px 5px;
+        letter-spacing: 0.05em;
+        margin-left: var(--space-sm);
+    }
+
+    .score-display {
+        display: flex;
+        align-items: center;
+        gap: var(--space-lg);
+        padding: var(--space-lg);
+        background: var(--bg-primary);
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--border);
+    }
+
+    .score-number {
+        font-family: var(--font-heading);
+        font-size: 3rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+
+    .tabs {
+        display: flex;
+        gap: var(--space-xs);
+        border-bottom: 1px solid var(--border);
+        margin-bottom: var(--space-lg);
+    }
+
+    .tab {
+        padding: var(--space-sm) var(--space-md);
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: var(--text-muted);
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -1px;
+        transition: var(--transition);
+        background: none;
+        border-top: none;
+        border-left: none;
+        border-right: none;
+        font-family: var(--font-body);
+    }
+
+    .tab:hover { color: var(--text-primary); }
+
+    .tab.active {
+        color: var(--navy);
+        border-bottom-color: var(--navy);
+        font-weight: 600;
+    }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .rate-card {
+        background: var(--bg-primary);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        padding: var(--space-md) var(--space-lg);
+        text-align: center;
+    }
+
+    .rate-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        margin-bottom: var(--space-xs);
+    }
+
+    .rate-value {
+        font-family: var(--font-heading);
+        font-size: 1.5rem;
+        font-weight: 700;
+    }
+
+    .suitability-note {
+        background: var(--bg-primary);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        padding: var(--space-lg);
+        font-family: var(--font-body);
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+        line-height: 1.8;
+        white-space: pre-wrap;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: var(--space-3xl) var(--space-xl);
+        color: var(--text-muted);
+    }
+
+    .empty-state-icon {
+        font-size: 3rem;
+        margin-bottom: var(--space-lg);
+        opacity: 0.4;
+    }
+
+    .empty-state-title {
+        font-family: var(--font-heading);
+        font-size: 1.5rem;
+        color: var(--text-secondary);
+        margin-bottom: var(--space-sm);
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="section-header">
+
+<!-- ── Page Header ─────────────────────────────────────── -->
+<div class="section-header mb-xl">
     <div>
         <h1 class="section-title">New Recommendation</h1>
-        <p class="section-subtitle">Coming soon</p>
+        <p class="section-subtitle">
+            Enter a client profile to generate an AI-powered portfolio allocation
+        </p>
     </div>
 </div>
+
+<!-- ── Two Column Layout ──────────────────────────────── -->
+<div class="portal-layout">
+
+    <!-- ── LEFT: Input Form ───────────────────────────── -->
+    <div class="portal-sidebar">
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">Client Profile</div>
+                <div class="card-subtitle">
+                    Enter the client details below
+                </div>
+            </div>
+
+            <form method="POST" action="{{ url_for('main.portal') }}" id="portal-form">
+
+                <!-- Client Name -->
+                <div class="form-group">
+                    <label class="form-label" for="client_name">
+                        Client Name *
+                    </label>
+                    <input
+                        type="text"
+                        id="client_name"
+                        name="client_name"
+                        class="form-input"
+                        placeholder="e.g. John Smith"
+                        value="{{ form_data.get('client_name', '') }}"
+                        required
+                    >
+                </div>
+
+                <!-- Age and Life Stage -->
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label" for="age">Age</label>
+                        <input
+                            type="number"
+                            id="age"
+                            name="age"
+                            class="form-input"
+                            min="18"
+                            max="90"
+                            value="{{ form_data.get('age', 45) }}"
+                            required
+                        >
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="life_stage">
+                            Life Stage
+                        </label>
+                        <select id="life_stage" name="life_stage" class="form-select">
+                            {% for stage in ["Early Career", "Mid-Career", "Pre-Retirement", "Retirement"] %}
+                            <option value="{{ stage }}"
+                                {{ "selected" if form_data.get("life_stage") == stage else "" }}>
+                                {{ stage }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Investment Amount -->
+                <div class="form-group">
+                    <label class="form-label" for="amount">
+                        Investment Amount ($)
+                    </label>
+                    <input
+                        type="number"
+                        id="amount"
+                        name="amount"
+                        class="form-input"
+                        min="1000"
+                        max="10000000"
+                        step="1000"
+                        value="{{ form_data.get('amount', 100000) }}"
+                        required
+                    >
+                </div>
+
+                <!-- Risk Tolerance -->
+                <div class="form-group">
+                    <label class="form-label">Risk Tolerance</label>
+                    <div class="risk-options">
+                        {% for level in ["Low", "Medium", "High"] %}
+                        <div class="risk-option">
+                            <input
+                                type="radio"
+                                id="risk_{{ level }}"
+                                name="risk"
+                                value="{{ level }}"
+                                {{ "checked" if form_data.get("risk", "Medium") == level else "" }}
+                            >
+                            <label class="risk-label" for="risk_{{ level }}">
+                                {{ level }}
+                            </label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Time Horizon -->
+                <div class="form-group">
+                    <label class="form-label" for="horizon">
+                        Time Horizon —
+                        <span id="horizon-value">
+                            {{ form_data.get('horizon', 10) }}
+                        </span> years
+                    </label>
+                    <input
+                        type="range"
+                        id="horizon"
+                        name="horizon"
+                        class="form-range"
+                        min="1"
+                        max="30"
+                        value="{{ form_data.get('horizon', 10) }}"
+                        oninput="updateRangeValue(this, 'horizon-value')"
+                    >
+                    <div class="range-labels">
+                        <span>1 year</span>
+                        <span>30 years</span>
+                    </div>
+                </div>
+
+                <!-- Submit -->
+                <button
+                    type="submit"
+                    class="btn btn-primary btn-full"
+                    id="submit-btn"
+                >
+                    Generate Recommendation
+                </button>
+
+            </form>
+        </div>
+    </div>
+
+    <!-- ── RIGHT: Results ─────────────────────────────── -->
+    <div class="portal-results">
+
+        {% if not result %}
+        <!-- Empty state — no recommendation yet -->
+        <div class="card">
+            <div class="empty-state">
+                <div class="empty-state-icon">📊</div>
+                <div class="empty-state-title">
+                    Ready to analyze
+                </div>
+                <p>
+                    Fill in the client profile on the left and click
+                    Generate Recommendation to see the AI-powered
+                    portfolio allocation with live market data.
+                </p>
+            </div>
+        </div>
+
+        {% else %}
+        <!-- Results — recommendation generated -->
+
+        <!-- ── Client Summary ──────────────────────── -->
+        <div class="stats-grid" style="grid-template-columns: 1fr 1fr 1fr">
+            <div class="stat-card">
+                <div class="stat-label">Client</div>
+                <div class="stat-value" style="font-size:1.2rem">
+                    {{ result.client_name }}
+                </div>
+                <div class="stat-sub">
+                    Age {{ result.age }} · {{ result.life_stage }}
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Investment</div>
+                <div class="stat-value">${{ "{:,}".format(result.amount) }}</div>
+                <div class="stat-sub">
+                    {{ result.horizon }}-year horizon · {{ result.risk }} risk
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Portfolio Score</div>
+                <div class="stat-value text-{{ result.score_color }}">
+                    {{ result.score }}/100
+                </div>
+                <div class="stat-sub">{{ result.score_label }}</div>
+            </div>
+        </div>
+
+        <!-- ── Allocation Breakdown ────────────────── -->
+        <div class="divider">
+            <div class="divider-line"></div>
+            <div class="divider-label">Portfolio Allocation</div>
+            <div class="divider-line"></div>
+        </div>
+
+        <div class="card">
+            {% set colors = ["#2c4a6e", "#d4a853", "#2d7d4f", "#c53030", "#6b46c1"] %}
+            {% for instrument, data in result.dollar_allocation.items() %}
+            {% set color = colors[loop.index0 % colors|length] %}
+            <div style="margin-bottom: var(--space-lg)">
+                <div class="flex-between mb-sm">
+                    <span style="font-weight:600;color:var(--text-primary);font-size:0.9rem">
+                        {{ instrument }}
+                    </span>
+                    <div style="text-align:right">
+                        <span style="font-weight:700;color:var(--text-primary)">
+                            {{ data.percentage }}%
+                        </span>
+                        <span style="color:var(--text-muted);font-size:0.8rem;margin-left:8px">
+                            ${{ "{:,}".format(data.amount) }}
+                        </span>
+                    </div>
+                </div>
+                <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden">
+                    <div style="height:100%;width:{{ data.percentage }}%;background:{{ color }};border-radius:4px"></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- ── Live Market Data ────────────────────── -->
+        {% if result.market_data %}
+        <div class="divider">
+            <div class="divider-line"></div>
+            <div class="divider-label">Live Market Data</div>
+            <div class="divider-line"></div>
+        </div>
+
+        <div class="card">
+            <!-- Tabs -->
+            <div class="tabs">
+                <button class="tab active" onclick="showTab('stocks-lt', this)">
+                    📈 Stocks LT
+                </button>
+                <button class="tab" onclick="showTab('stocks-st', this)">
+                    ⚡ Stocks ST
+                </button>
+                <button class="tab" onclick="showTab('bonds', this)">
+                    🏦 Bonds
+                </button>
+                <button class="tab" onclick="showTab('mutual-funds', this)">
+                    📊 Mutual Funds
+                </button>
+                <button class="tab" onclick="showTab('rates', this)">
+                    💰 Rates
+                </button>
+            </div>
+
+            <!-- Stocks Long Term -->
+            <div id="stocks-lt" class="tab-content active">
+                {% for stock in result.market_data.stocks_lt %}
+                <div class="instrument-card">
+                    <div class="instrument-ticker">
+                        {{ stock.ticker }}
+                        <span class="live-badge">LIVE</span>
+                    </div>
+                    <div class="instrument-name">{{ stock.name }}</div>
+                    <div class="instrument-price">${{ stock.price }}</div>
+                    <div class="instrument-detail">
+                        Div: {{ stock.dividend_yield }}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Stocks Short Term -->
+            <div id="stocks-st" class="tab-content">
+                {% for stock in result.market_data.stocks_st %}
+                <div class="instrument-card">
+                    <div class="instrument-ticker">
+                        {{ stock.ticker }}
+                        <span class="live-badge">LIVE</span>
+                    </div>
+                    <div class="instrument-name">{{ stock.name }}</div>
+                    <div class="instrument-price">${{ stock.price }}</div>
+                    <div class="instrument-detail">
+                        P/E: {{ stock.pe_ratio }}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Bonds -->
+            <div id="bonds" class="tab-content">
+                {% for bond in result.market_data.bonds %}
+                <div class="instrument-card">
+                    <div class="instrument-ticker">
+                        {{ bond.ticker }}
+                        <span class="live-badge">LIVE</span>
+                    </div>
+                    <div class="instrument-name">{{ bond.name }}</div>
+                    <div class="instrument-price">${{ bond.price }}</div>
+                    <div class="instrument-detail">
+                        Yield: {{ bond.dividend_yield }}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Mutual Funds -->
+            <div id="mutual-funds" class="tab-content">
+                {% for fund in result.market_data.mutual_funds %}
+                <div class="instrument-card">
+                    <div class="instrument-ticker">
+                        {{ fund.ticker }}
+                        <span class="live-badge">LIVE</span>
+                    </div>
+                    <div class="instrument-name">{{ fund.name }}</div>
+                    <div class="instrument-price">${{ fund.price }}</div>
+                    <div class="instrument-detail">
+                        Exp: {{ fund.expense_ratio }}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Rates -->
+            <div id="rates" class="tab-content">
+                <p style="font-size:0.75rem;font-weight:600;color:var(--text-muted);
+                letter-spacing:0.08em;text-transform:uppercase;margin-bottom:var(--space-md)">
+                    US Treasury Rates
+                </p>
+                <div class="grid-3" style="margin-bottom:var(--space-lg)">
+                    {% set rate_items = [
+                        ("3-Month", result.market_data.rates.get("3_month_treasury")),
+                        ("1-Year", result.market_data.rates.get("1_year_treasury")),
+                        ("10-Year", result.market_data.rates.get("10_year_treasury"))
+                    ] %}
+                    {% for label, rate in rate_items %}
+                    <div class="rate-card">
+                        <div class="rate-label">{{ label }} Treasury</div>
+                        <div class="rate-value" style="color:var(--navy)">
+                            {{ rate }}% if rate else "N/A"
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <p style="font-size:0.75rem;font-weight:600;color:var(--text-muted);
+                letter-spacing:0.08em;text-transform:uppercase;margin-bottom:var(--space-md)">
+                    CD Rates (Estimated)
+                </p>
+                <div class="grid-3">
+                    {% set cd_items = [
+                        ("3-Month CD", result.market_data.rates.get("cd_3_month")),
+                        ("6-Month CD", result.market_data.rates.get("cd_6_month")),
+                        ("1-Year CD", result.market_data.rates.get("cd_1_year"))
+                    ] %}
+                    {% for label, rate in cd_items %}
+                    <div class="rate-card">
+                        <div class="rate-label">{{ label }}</div>
+                        <div class="rate-value" style="color:var(--success)">
+                            {{ rate }}% if rate else "N/A"
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <p style="font-size:0.75rem;color:var(--text-muted);
+                margin-top:var(--space-md);line-height:1.6">
+                    ⚠ CD rates are estimates based on current Treasury spreads.
+                    Verify current rates with specific banks before recommending.
+                </p>
+            </div>
+
+        </div>
+        {% endif %}
+
+        <!-- ── Advisor Flags ───────────────────────── -->
+        <div class="divider">
+            <div class="divider-line"></div>
+            <div class="divider-label">Advisor Flags</div>
+            <div class="divider-line"></div>
+        </div>
+
+        <div style="margin-bottom:var(--space-xl)">
+            {% for flag in result.flags %}
+            <div class="flash flash-{{ flag.type }}" style="margin-bottom:var(--space-sm)">
+                {{ flag.message }}
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- ── Suitability Note ────────────────────── -->
+        <div class="divider">
+            <div class="divider-line"></div>
+            <div class="divider-label">Suitability Documentation</div>
+            <div class="divider-line"></div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">Suitability Assessment Note</div>
+                <div class="card-subtitle">
+                    Auto-generated compliance documentation —
+                    review and sign before filing
+                </div>
+            </div>
+            <div class="suitability-note">{{ result.suitability_note }}</div>
+        </div>
+
+        <!-- ── Actions ────────────────────────────── -->
+        <div class="divider">
+            <div class="divider-line"></div>
+            <div class="divider-label">Actions</div>
+            <div class="divider-line"></div>
+        </div>
+
+        <div class="flex gap-md" style="margin-bottom:var(--space-2xl)">
+            <button class="btn btn-primary" onclick="alert('Save client — coming soon!')">
+                💾 Save Client Profile
+            </button>
+            <button class="btn btn-accent" onclick="alert('PDF export — coming soon!')">
+                📄 Download PDF Report
+            </button>
+            <a href="{{ url_for('main.portal') }}" class="btn btn-ghost">
+                + New Recommendation
+            </a>
+        </div>
+
+        <!-- ── Disclaimer ──────────────────────────── -->
+        <div style="font-size:0.75rem;color:var(--text-muted);
+        border-top:1px solid var(--border);padding-top:var(--space-lg);
+        margin-bottom:var(--space-2xl);line-height:1.6">
+            ⚖ This recommendation was generated by AdvisorNest as decision
+            support for licensed financial advisors only. All recommendations
+            require advisor review and client suitability assessment before
+            implementation. Not financial advice.
+        </div>
+
+        {% endif %}
+
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Tab switching for market data
+function showTab(tabId, button) {
+    // Hide all tab contents
+    document.querySelectorAll('.tab-content').forEach(function(content) {
+        content.classList.remove('active');
+    });
+
+    // Remove active from all tabs
+    document.querySelectorAll('.tab').forEach(function(tab) {
+        tab.classList.remove('active');
+    });
+
+    // Show selected tab
+    document.getElementById(tabId).classList.add('active');
+    button.classList.add('active');
+}
+
+// Show loading state when form submitted
+document.getElementById('portal-form').addEventListener('submit', function() {
+    const btn = document.getElementById('submit-btn');
+    btn.textContent = 'Fetching live market data...';
+    btn.disabled = true;
+});
+</script>
 {% endblock %}
