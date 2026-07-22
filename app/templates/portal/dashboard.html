@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — AdvisorNest{% endblock %}
+
+{% block content %}
+
+<!-- ── Page Header ─────────────────────────────────────── -->
+<div class="section-header">
+    <div>
+        <h1 class="section-title">
+            Good day, {{ advisor.full_name.split()[0] }}
+        </h1>
+        <p class="section-subtitle">
+            {{ advisor.firm_name if advisor.firm_name else "Independent Advisor" }}
+            · Welcome to AdvisorNest
+        </p>
+    </div>
+    <a href="{{ url_for('main.portal') }}" class="btn btn-primary">
+        + New Recommendation
+    </a>
+</div>
+
+<!-- ── Stats Row ──────────────────────────────────────── -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-label">Saved Clients</div>
+        <div class="stat-value">0</div>
+        <div class="stat-sub">No clients saved yet</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Recommendations</div>
+        <div class="stat-value">0</div>
+        <div class="stat-sub">Generate your first one</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Advisor</div>
+        <div class="stat-value" style="font-size:1.1rem">
+            {{ advisor.full_name }}
+        </div>
+        <div class="stat-sub">{{ advisor.email }}</div>
+    </div>
+</div>
+
+<!-- ── Quick Actions ──────────────────────────────────── -->
+<div class="divider">
+    <div class="divider-line"></div>
+    <div class="divider-label">Quick Actions</div>
+    <div class="divider-line"></div>
+</div>
+
+<div class="grid-3" style="margin-bottom: var(--space-2xl)">
+
+    <div class="card text-center">
+        <div style="font-size:2rem;margin-bottom:var(--space-md)">📊</div>
+        <h3 class="card-title">New Recommendation</h3>
+        <p style="font-size:0.875rem;margin:var(--space-md) 0">
+            Generate an AI-powered portfolio allocation for a client
+        </p>
+        <a href="{{ url_for('main.portal') }}" class="btn btn-primary btn-full">
+            Get Started
+        </a>
+    </div>
+
+    <div class="card text-center">
+        <div style="font-size:2rem;margin-bottom:var(--space-md)">👥</div>
+        <h3 class="card-title">My Clients</h3>
+        <p style="font-size:0.875rem;margin:var(--space-md) 0">
+            View and manage all your saved client profiles
+        </p>
+        <a href="{{ url_for('main.clients') }}" class="btn btn-outline btn-full">
+            View Clients
+        </a>
+    </div>
+
+    <div class="card text-center">
+        <div style="font-size:2rem;margin-bottom:var(--space-md)">📋</div>
+        <h3 class="card-title">PDF Reports</h3>
+        <p style="font-size:0.875rem;margin:var(--space-md) 0">
+            Download branded reports to share with your clients
+        </p>
+        <a href="{{ url_for('main.clients') }}" class="btn btn-outline btn-full">
+            View Reports
+        </a>
+    </div>
+
+</div>
+
+<!-- ── Getting Started ────────────────────────────────── -->
+<div class="divider">
+    <div class="divider-line"></div>
+    <div class="divider-label">Getting Started</div>
+    <div class="divider-line"></div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Welcome to AdvisorNest</div>
+        <div class="card-subtitle">
+            Here is how to get the most out of your account
+        </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:var(--space-lg)">
+
+        <div style="display:flex;align-items:flex-start;gap:var(--space-lg)">
+            <div style="
+                width:32px;height:32px;border-radius:50%;
+                background:var(--navy);color:white;
+                display:flex;align-items:center;justify-content:center;
+                font-size:0.875rem;font-weight:600;flex-shrink:0
+            ">1</div>
+            <div>
+                <div style="font-weight:600;color:var(--text-primary);margin-bottom:4px">
+                    Generate your first recommendation
+                </div>
+                <div style="font-size:0.875rem;color:var(--text-muted)">
+                    Click "New Recommendation" and enter a client's profile — 
+                    risk tolerance, investment amount, time horizon, and age. 
+                    AdvisorNest will generate a complete portfolio allocation 
+                    with live market data in seconds.
+                </div>
+            </div>
+        </div>
+
+        <div style="display:flex;align-items:flex-start;gap:var(--space-lg)">
+            <div style="
+                width:32px;height:32px;border-radius:50%;
+                background:var(--accent);color:white;
+                display:flex;align-items:center;justify-content:center;
+                font-size:0.875rem;font-weight:600;flex-shrink:0
+            ">2</div>
+            <div>
+                <div style="font-weight:600;color:var(--text-primary);margin-bottom:4px">
+                    Save the client profile
+                </div>
+                <div style="font-size:0.875rem;color:var(--text-muted)">
+                    After reviewing the recommendation, save the client profile 
+                    to your account. You can come back anytime to view or 
+                    update their allocation.
+                </div>
+            </div>
+        </div>
+
+        <div style="display:flex;align-items:flex-start;gap:var(--space-lg)">
+            <div style="
+                width:32px;height:32px;border-radius:50%;
+                background:var(--success);color:white;
+                display:flex;align-items:center;justify-content:center;
+                font-size:0.875rem;font-weight:600;flex-shrink:0
+            ">3</div>
+            <div>
+                <div style="font-weight:600;color:var(--text-primary);margin-bottom:4px">
+                    Download the PDF report
+                </div>
+                <div style="font-size:0.875rem;color:var(--text-muted)">
+                    Generate a branded AdvisorNest PDF report you can 
+                    hand directly to your client. Professional, clear, 
+                    and ready to present.
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}Log In — AdvisorNest{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+    <div class="auth-container">
+
+        <!-- ── Logo ────────────────────────────────── -->
+        <div class="auth-logo">
+            <div class="auth-logo-text">
+                Advisor<span>Nest</span>
+            </div>
+            <div class="auth-logo-tagline">
+                Where great portfolios are built
+            </div>
+        </div>
+
+        <!-- ── Login Card ───────────────────────────── -->
+        <div class="auth-card">
+
+            <h1 class="auth-title">Welcome back</h1>
+            <p class="auth-subtitle">
+                Log in to your advisor account
+            </p>
+
+            <form method="POST" action="{{ url_for('main.login') }}">
+
+                <div class="form-group">
+                    <label class="form-label" for="email">
+                        Email Address
+                    </label>
+                    <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        class="form-input"
+                        placeholder="you@yourfirm.com"
+                        required
+                        autocomplete="email"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="password">
+                        Password
+                    </label>
+                    <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        class="form-input"
+                        placeholder="Your password"
+                        required
+                        autocomplete="current-password"
+                    >
+                </div>
+
+                <button
+                    type="submit"
+                    class="btn btn-primary btn-full mt-md"
+                >
+                    Log In to AdvisorNest
+                </button>
+
+            </form>
+
+            <div class="divider mt-xl">
+                <div class="divider-line"></div>
+                <div class="divider-label">New to AdvisorNest?</div>
+                <div class="divider-line"></div>
+            </div>
+
+            
+                href="{{ url_for('main.register') }}"
+                class="btn btn-outline btn-full"
+            >
+                Create an Account
+            </a>
+
+        </div>
+
+        <div class="auth-footer mt-lg">
+            <p>
+                For licensed financial advisors only.
+                <br>
+                By logging in you agree to our
+                <a href="#">Terms of Service</a>
+                and
+                <a href="#">Privacy Policy</a>.
+            </p>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

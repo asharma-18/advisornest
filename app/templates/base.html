@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Page title — each page can override this -->
+    <title>{% block title %}AdvisorNest{% endblock %}</title>
+    
+    <!-- Google Fonts — Playfair Display for headings, Inter for body -->
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Your main CSS file -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
+    <!-- Each page can add its own CSS -->
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+
+    <!-- ── Navigation Bar ─────────────────────────── -->
+    <nav class="navbar">
+        <div class="nav-container">
+            
+            <!-- Logo -->
+            <a href="{{ url_for('main.home') }}" class="nav-logo">
+                Advisor<span>Nest</span>
+            </a>
+            
+            <!-- Navigation links — only show when logged in -->
+            {% if session.get('logged_in') %}
+            <div class="nav-links">
+                <a href="{{ url_for('main.dashboard') }}" 
+                   class="nav-link {% if request.endpoint == 'main.dashboard' %}active{% endif %}">
+                    Dashboard
+                </a>
+                <a href="{{ url_for('main.portal') }}" 
+                   class="nav-link {% if request.endpoint == 'main.portal' %}active{% endif %}">
+                    New Recommendation
+                </a>
+                <a href="{{ url_for('main.clients') }}" 
+                   class="nav-link {% if request.endpoint == 'main.clients' %}active{% endif %}">
+                    Clients
+                </a>
+            </div>
+            
+            <!-- Advisor info and logout -->
+            <div class="nav-right">
+                <span class="nav-advisor">
+                    {{ session.get('advisor', {}).get('full_name', '') }}
+                </span>
+                <a href="{{ url_for('main.logout') }}" class="nav-logout">
+                    Log Out
+                </a>
+            </div>
+            {% endif %}
+            
+        </div>
+    </nav>
+
+    <!-- ── Flash Messages ─────────────────────────── -->
+    <!-- These are temporary messages like 
+         "Login successful" or "Wrong password" -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="flash-container">
+                {% for category, message in messages %}
+                    <div class="flash flash-{{ category }}">
+                        {{ message }}
+                        <button class="flash-close" onclick="this.parentElement.remove()">×</button>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <!-- ── Main Content ───────────────────────────── -->
+    <!-- Each page fills this block with its own content -->
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- ── Footer ────────────────────────────────── -->
+    <footer class="footer">
+        <div class="footer-container">
+            <div class="footer-left">
+                <span class="footer-logo">AdvisorNest</span>
+                <span class="footer-tagline">Where great portfolios are built</span>
+            </div>
+            <div class="footer-right">
+                <p class="footer-disclaimer">
+                    ⚖ AdvisorNest provides decision support for licensed financial advisors only. 
+                    All recommendations require advisor review and client suitability assessment 
+                    before implementation. Not financial advice.
+                </p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Your main JavaScript file -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    
+    <!-- Each page can add its own JavaScript -->
+    {% block extra_js %}{% endblock %}
+
+</body>
+</html>

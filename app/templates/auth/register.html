@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}Create Account — AdvisorNest{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+    <div class="auth-container">
+
+        <!-- ── Logo ────────────────────────────────── -->
+        <div class="auth-logo">
+            <div class="auth-logo-text">
+                Advisor<span>Nest</span>
+            </div>
+            <div class="auth-logo-tagline">
+                Where great portfolios are built
+            </div>
+        </div>
+
+        <!-- ── Register Card ────────────────────────── -->
+        <div class="auth-card">
+
+            <h1 class="auth-title">Create your account</h1>
+            <p class="auth-subtitle">
+                Join AdvisorNest — built for independent financial advisors
+            </p>
+
+            <form method="POST" action="{{ url_for('main.register') }}">
+
+                <!-- Full Name -->
+                <div class="form-group">
+                    <label class="form-label" for="full_name">
+                        Full Name <span style="color:var(--error)">*</span>
+                    </label>
+                    <input
+                        type="text"
+                        id="full_name"
+                        name="full_name"
+                        class="form-input"
+                        placeholder="e.g. Sarah Johnson"
+                        required
+                        autocomplete="name"
+                    >
+                </div>
+
+                <!-- Firm Name -->
+                <div class="form-group">
+                    <label class="form-label" for="firm_name">
+                        Firm Name
+                    </label>
+                    <input
+                        type="text"
+                        id="firm_name"
+                        name="firm_name"
+                        class="form-input"
+                        placeholder="e.g. Johnson Wealth Management"
+                        autocomplete="organization"
+                    >
+                    <div class="form-hint">
+                        Optional — leave blank if independent
+                    </div>
+                </div>
+
+                <!-- Email -->
+                <div class="form-group">
+                    <label class="form-label" for="email">
+                        Email Address <span style="color:var(--error)">*</span>
+                    </label>
+                    <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        class="form-input"
+                        placeholder="you@yourfirm.com"
+                        required
+                        autocomplete="email"
+                    >
+                </div>
+
+                <!-- Password -->
+                <div class="form-group">
+                    <label class="form-label" for="password">
+                        Password <span style="color:var(--error)">*</span>
+                    </label>
+                    <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        class="form-input"
+                        placeholder="Minimum 8 characters"
+                        required
+                        minlength="8"
+                        autocomplete="new-password"
+                    >
+                    <div class="form-hint">
+                        Must be at least 8 characters
+                    </div>
+                </div>
+
+                <!-- Confirm Password -->
+                <div class="form-group">
+                    <label class="form-label" for="confirm_password">
+                        Confirm Password <span style="color:var(--error)">*</span>
+                    </label>
+                    <input
+                        type="password"
+                        id="confirm_password"
+                        name="confirm_password"
+                        class="form-input"
+                        placeholder="Repeat your password"
+                        required
+                        autocomplete="new-password"
+                    >
+                </div>
+
+                <!-- Submit -->
+                <button
+                    type="submit"
+                    class="btn btn-primary btn-full mt-md"
+                >
+                    Create My Account
+                </button>
+
+            </form>
+
+            <!-- Divider -->
+            <div class="divider mt-xl">
+                <div class="divider-line"></div>
+                <div class="divider-label">Already have an account?</div>
+                <div class="divider-line"></div>
+            </div>
+
+            <!-- Login link -->
+            
+                href="{{ url_for('main.login') }}"
+                class="btn btn-outline btn-full"
+            >
+                Log In Instead
+            </a>
+
+        </div>
+
+        <!-- Footer note -->
+        <div class="auth-footer mt-lg">
+            <p>
+                For licensed financial advisors only.
+                <br>
+                By registering you agree to our
+                <a href="#">Terms of Service</a>
+                and
+                <a href="#">Privacy Policy</a>.
+            </p>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
