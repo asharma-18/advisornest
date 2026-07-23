@@ -644,23 +644,49 @@
         </div>
 
         <!-- ── Actions ────────────────────────────── -->
-        <div class="divider">
-            <div class="divider-line"></div>
-            <div class="divider-label">Actions</div>
-            <div class="divider-line"></div>
-        </div>
-
         <div class="flex gap-md" style="margin-bottom:var(--space-2xl)">
-            <button class="btn btn-primary" onclick="alert('Save client — coming soon!')">
-                💾 Save Client Profile
-            </button>
-            <button class="btn btn-accent" onclick="alert('PDF export — coming soon!')">
-                📄 Download PDF Report
-            </button>
-            <a href="{{ url_for('main.portal') }}" class="btn btn-ghost">
-                + New Recommendation
-            </a>
-        </div>
+
+    <!-- Save Client Form -->
+    <form method="POST" action="{{ url_for('main.save_client_route') }}"
+          style="display:inline">
+
+        <!-- Hidden fields carry all the data -->
+        <input type="hidden" name="client_name"
+               value="{{ result.client_name }}">
+        <input type="hidden" name="age"
+               value="{{ result.age }}">
+        <input type="hidden" name="life_stage"
+               value="{{ result.life_stage }}">
+        <input type="hidden" name="amount"
+               value="{{ result.amount }}">
+        <input type="hidden" name="risk"
+               value="{{ result.risk }}">
+        <input type="hidden" name="horizon"
+               value="{{ result.horizon }}">
+        <input type="hidden" name="allocation"
+               value="{{ result.allocation_json }}">
+        <input type="hidden" name="score"
+               value="{{ result.score }}">
+        <input type="hidden" name="flags"
+               value="{{ result.flags_json }}">
+        <input type="hidden" name="suitability_note"
+               value="{{ result.suitability_note }}">
+
+        <button type="submit" class="btn btn-primary">
+            💾 Save Client Profile
+        </button>
+    </form>
+
+    <button class="btn btn-accent"
+            onclick="alert('PDF export — coming soon!')">
+        📄 Download PDF Report
+    </button>
+
+    <a href="{{ url_for('main.portal') }}" class="btn btn-ghost">
+        + New Recommendation
+    </a>
+
+</div>
 
         <!-- ── Disclaimer ──────────────────────────── -->
         <div style="font-size:0.75rem;color:var(--text-muted);

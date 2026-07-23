@@ -24,8 +24,10 @@
 <div class="stats-grid">
     <div class="stat-card">
         <div class="stat-label">Saved Clients</div>
-        <div class="stat-value">0</div>
-        <div class="stat-sub">No clients saved yet</div>
+        <div class="stat-value">{{ client_count }}</div>
+        <div class="stat-sub">
+    {{ "No clients saved yet" if client_count == 0 else "clients in your account" }}
+</div>
     </div>
     <div class="stat-card">
         <div class="stat-label">Recommendations</div>

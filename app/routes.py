@@ -1,7 +1,8 @@
-from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, session, flash
 from auth import login_advisor, register_advisor
 from logic import calculate_allocation, portfolio_score, get_advisor_flags, generate_suitability_note
 from market_data import get_all_market_data
+from clients_db import save_client, get_all_clients, get_client, delete_client, get_client_count
 import json
 
 main = Blueprint("main", __name__)
@@ -25,16 +26,13 @@ def login():
         email    = request.form.get("email", "").strip()
         password = request.form.get("password", "")
 
-        # Basic validation
         if not email or not password:
             flash("Please enter both email and password.", "error")
             return redirect(url_for("main.login"))
 
-        # Attempt login
         result = login_advisor(email, password)
 
         if result["success"]:
-            # Store advisor info in session
             session["logged_in"] = True
             session["advisor"]   = {
                 "user_id":   result["user_id"],
@@ -64,7 +62,6 @@ def register():
         password  = request.form.get("password", "")
         confirm   = request.form.get("confirm_password", "")
 
-        # Validation
         if not full_name or not email or not password:
             flash("Please fill in all required fields.", "error")
             return redirect(url_for("main.register"))
@@ -77,7 +74,6 @@ def register():
             flash("Passwords do not match.", "error")
             return redirect(url_for("main.register"))
 
-        # Attempt registration
         result = register_advisor(email, password, full_name, firm_name)
 
         if result["success"]:
@@ -97,8 +93,12 @@ def dashboard():
         flash("Please log in to continue.", "info")
         return redirect(url_for("main.login"))
 
+    advisor_id   = session["advisor"]["user_id"]
+    client_count = get_client_count(advisor_id)
+
     return render_template("portal/dashboard.html",
-        advisor=session.get("advisor"))
+        advisor=session.get("advisor"),
+        client_count=client_count)
 
 
 # ── Portal ────────────────────────────────────────────────
@@ -108,12 +108,10 @@ def portal():
         flash("Please log in to continue.", "info")
         return redirect(url_for("main.login"))
 
-    # Default values for the form
-    result     = None
-    form_data  = {}
+    result    = None
+    form_data = {}
 
     if request.method == "POST":
-        # Get form data
         client_name = request.form.get("client_name", "").strip()
         age         = int(request.form.get("age", 45))
         life_stage  = request.form.get("life_stage", "Mid-Career")
@@ -121,7 +119,6 @@ def portal():
         risk        = request.form.get("risk", "Medium")
         horizon     = int(request.form.get("horizon", 10))
 
-        # Remember what the advisor typed
         form_data = {
             "client_name": client_name,
             "age":         age,
@@ -131,14 +128,14 @@ def portal():
             "horizon":     horizon
         }
 
-        # Validate
         if not client_name:
             flash("Please enter a client name.", "error")
             return render_template("portal/index.html",
                 advisor=session.get("advisor"),
-                form_data=form_data)
+                form_data=form_data,
+                result=None)
 
-        # Run the core logic
+        # Run core logic
         allocation       = calculate_allocation(risk, horizon, age)
         score            = portfolio_score(risk, horizon, age)
         flags            = get_advisor_flags(risk, horizon, age)
@@ -157,7 +154,7 @@ def portal():
         dollar_allocation = {
             instrument: {
                 "percentage": pct,
-                "amount": round((pct / 100) * amount)
+                "amount":     round((pct / 100) * amount)
             }
             for instrument, pct in allocation.items()
         }
@@ -190,10 +187,46 @@ def portal():
             "suitability_note":  suitability_note,
         }
 
+        # Pre-convert to JSON for hidden form fields
+        result["allocation_json"] = json.dumps(allocation)
+        result["flags_json"]      = json.dumps(flags)
+
     return render_template("portal/index.html",
         advisor=session.get("advisor"),
         result=result,
         form_data=form_data)
+
+
+# ── Save Client ───────────────────────────────────────────
+@main.route("/save-client", methods=["POST"])
+def save_client_route():
+    if not session.get("logged_in"):
+        return redirect(url_for("main.login"))
+
+    advisor_id = session["advisor"]["user_id"]
+
+    client_data = {
+        "client_name":      request.form.get("client_name"),
+        "age":              int(request.form.get("age")),
+        "life_stage":       request.form.get("life_stage"),
+        "amount":           int(request.form.get("amount")),
+        "risk":             request.form.get("risk"),
+        "horizon":          int(request.form.get("horizon")),
+        "allocation":       json.loads(request.form.get("allocation")),
+        "score":            int(request.form.get("score")),
+        "flags":            json.loads(request.form.get("flags")),
+        "suitability_note": request.form.get("suitability_note"),
+    }
+
+    result = save_client(advisor_id, client_data)
+
+    if result["success"]:
+        flash(result["message"], "success")
+    else:
+        flash(result["message"], "error")
+
+    return redirect(url_for("main.clients"))
+
 
 # ── Clients ───────────────────────────────────────────────
 @main.route("/clients")
@@ -202,8 +235,50 @@ def clients():
         flash("Please log in to continue.", "info")
         return redirect(url_for("main.login"))
 
+    advisor_id   = session["advisor"]["user_id"]
+    all_clients  = get_all_clients(advisor_id)
+    client_count = get_client_count(advisor_id)
+
     return render_template("clients/list.html",
-        advisor=session.get("advisor"))
+        advisor=session.get("advisor"),
+        clients=all_clients,
+        client_count=client_count)
+
+
+# ── Delete Client ─────────────────────────────────────────
+@main.route("/delete-client/<client_id>", methods=["POST"])
+def delete_client_route(client_id):
+    if not session.get("logged_in"):
+        return redirect(url_for("main.login"))
+
+    advisor_id = session["advisor"]["user_id"]
+    result     = delete_client(client_id, advisor_id)
+
+    if result["success"]:
+        flash(result["message"], "success")
+    else:
+        flash(result["message"], "error")
+
+    return redirect(url_for("main.clients"))
+
+
+# ── View Client ───────────────────────────────────────────
+@main.route("/clients/<client_id>")
+def view_client(client_id):
+    if not session.get("logged_in"):
+        flash("Please log in to continue.", "info")
+        return redirect(url_for("main.login"))
+
+    advisor_id = session["advisor"]["user_id"]
+    client     = get_client(client_id, advisor_id)
+
+    if not client:
+        flash("Client not found.", "error")
+        return redirect(url_for("main.clients"))
+
+    return render_template("clients/view.html",
+        advisor=session.get("advisor"),
+        client=client)
 
 
 # ── Logout ────────────────────────────────────────────────

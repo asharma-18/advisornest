@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}My Clients — AdvisorNest{% endblock %}
+
+{% block content %}
+
+<!-- ── Page Header ─────────────────────────────────────── -->
+<div class="section-header">
+    <div>
+        <h1 class="section-title">My Clients</h1>
+        <p class="section-subtitle">
+            {{ client_count }} client{{ "s" if client_count != 1 else "" }} saved to your account
+        </p>
+    </div>
+    <a href="{{ url_for('main.portal') }}" class="btn btn-primary">
+        + New Recommendation
+    </a>
+</div>
+
+{% if clients %}
+
+<!-- ── Clients Table ──────────────────────────────────── -->
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>Client Name</th>
+                <th>Age</th>
+                <th>Life Stage</th>
+                <th>Investment</th>
+                <th>Risk</th>
+                <th>Horizon</th>
+                <th>Score</th>
+                <th>Saved</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for client in clients %}
+            <tr>
+                <td>
+                    <a href="{{ url_for('main.view_client', client_id=client.id) }}"
+                       style="font-weight:600;color:var(--navy)">
+                        {{ client.client_name }}
+                    </a>
+                </td>
+                <td>{{ client.age }}</td>
+                <td>{{ client.life_stage }}</td>
+                <td>${{ "{:,}".format(client.amount) }}</td>
+                <td>
+                    <span class="badge
+                        {% if client.risk == 'High' %}badge-error
+                        {% elif client.risk == 'Medium' %}badge-gold
+                        {% else %}badge-success{% endif %}">
+                        {{ client.risk }}
+                    </span>
+                </td>
+                <td>{{ client.horizon }} yrs</td>
+                <td>
+                    <span style="font-weight:600;
+                        color:{% if client.score >= 80 %}var(--success)
+                        {% elif client.score >= 60 %}var(--warning)
+                        {% else %}var(--error){% endif %}">
+                        {{ client.score }}/100
+                    </span>
+                </td>
+                <td style="color:var(--text-muted);font-size:0.8rem">
+                    {{ client.created_at[:10] }}
+                </td>
+                <td>
+                    <div class="flex gap-sm">
+                        <a href="{{ url_for('main.view_client', client_id=client.id) }}"
+                           class="btn btn-ghost btn-sm">
+                            View
+                        </a>
+                        <form method="POST"
+                              action="{{ url_for('main.delete_client_route', client_id=client.id) }}"
+                              onsubmit="return confirm('Delete {{ client.client_name }}? This cannot be undone.')">
+                            <button type="submit" class="btn btn-ghost btn-sm"
+                                    style="color:var(--error)">
+                                Delete
+                            </button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% else %}
+
+<!-- ── Empty State ────────────────────────────────────── -->
+<div class="card">
+    <div class="empty-state">
+        <div class="empty-state-icon">👥</div>
+        <div class="empty-state-title">No clients saved yet</div>
+        <p style="margin-bottom:var(--space-xl)">
+            Generate a recommendation and save the client profile
+            to see them listed here.
+        </p>
+        <a href="{{ url_for('main.portal') }}" class="btn btn-primary">
+            Generate First Recommendation
+        </a>
+    </div>
+</div>
+
+{% endif %}
+
+{% endblock %}
