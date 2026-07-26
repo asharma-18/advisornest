@@ -1,3 +1,5 @@
+from pdf_generator import generate_pdf_report
+from flask import send_file
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
 from auth import login_advisor, register_advisor
 from logic import calculate_allocation, portfolio_score, get_advisor_flags, generate_suitability_note
@@ -280,6 +282,31 @@ def view_client(client_id):
         advisor=session.get("advisor"),
         client=client)
 
+# ── Download PDF ──────────────────────────────────────────
+@main.route("/download-pdf/<client_id>")
+def download_pdf(client_id):
+    if not session.get("logged_in"):
+        return redirect(url_for("main.login"))
+
+    advisor_id = session["advisor"]["user_id"]
+    client     = get_client(client_id, advisor_id)
+
+    if not client:
+        flash("Client not found.", "error")
+        return redirect(url_for("main.clients"))
+
+    # Generate the PDF
+    pdf_buffer = generate_pdf_report(client, session["advisor"])
+
+    # Send as downloadable file
+    filename = f"AdvisorNest_{client['client_name'].replace(' ', '_')}_Report.pdf"
+
+    return send_file(
+        pdf_buffer,
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=filename
+    )
 
 # ── Logout ────────────────────────────────────────────────
 @main.route("/logout")

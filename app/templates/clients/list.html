@@ -73,10 +73,16 @@
                            class="btn btn-ghost btn-sm">
                             View
                         </a>
+                        <a href="{{ url_for('main.download_pdf', client_id=client.id) }}"
+                           class="btn btn-ghost btn-sm"
+                           style="color:var(--accent)">
+                            PDF
+                        </a>
                         <form method="POST"
                               action="{{ url_for('main.delete_client_route', client_id=client.id) }}"
                               onsubmit="return confirm('Delete {{ client.client_name }}? This cannot be undone.')">
-                            <button type="submit" class="btn btn-ghost btn-sm"
+                            <button type="submit"
+                                    class="btn btn-ghost btn-sm"
                                     style="color:var(--error)">
                                 Delete
                             </button>

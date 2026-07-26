@@ -152,15 +152,6 @@ This recommendation was generated using AdvisorNest as a
 decision support tool. The final recommendation has been 
 reviewed and approved by the licensed financial advisor.
 
-ADVISOR CONFIRMATION:
-This allocation is suitable for the client based on their 
-stated investment objectives, risk tolerance, time horizon, 
-and financial situation as documented above.
-
-Advisor: ___________________________
-Date: ___________________________
-Signature: ___________________________
-
 ⚖ This document was prepared using AdvisorNest decision 
 support software. All recommendations require advisor review 
 and client suitability assessment before implementation.
