@@ -95,3 +95,21 @@ def login_advisor(email, password):
             "success": False,
             "message": "Login failed. Please try again."
         }
+
+def get_google_auth_url():
+    """
+    Generates the Google OAuth URL that the advisor
+    clicks to sign in with Google.
+    """
+    try:
+        response = supabase.auth.sign_in_with_oauth({
+            "provider": "google",
+            "options": {
+                "redirect_to": os.getenv("GOOGLE_REDIRECT_URI",
+                    "http://127.0.0.1:5000/auth/google/callback")
+            }
+        })
+        return response.url
+    except Exception as e:
+        print(f"Google auth error: {str(e)}")
+        return None

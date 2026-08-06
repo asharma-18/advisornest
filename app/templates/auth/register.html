@@ -2,155 +2,1119 @@
 
 {% block title %}Create Account — AdvisorNest{% endblock %}
 
+{% block extra_css %}
+<style>
+    .navbar { display: none; }
+    .footer { display: none; }
+    .main-content { padding: 0; max-width: 100%; }
+    * { box-sizing: border-box; }
+
+    .auth-wrapper {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background: #f7f3eb;
+    }
+
+    /* ── Navbar ── */
+    .auth-nav {
+        background: var(--navy);
+        padding: 0 52px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 56px;
+        flex-shrink: 0;
+    }
+
+    .auth-nav-logo {
+        font-family: var(--font-heading);
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: white;
+    }
+
+    .auth-nav-logo span {
+        color: var(--accent);
+        font-style: italic;
+    }
+
+    .auth-nav-links {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .auth-nav-link {
+        font-size: 0.75rem;
+        color: rgba(255,255,255,0.45);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        font-weight: 500;
+        padding: 6px 14px;
+        border-radius: 4px;
+        text-decoration: none;
+        transition: all 0.2s;
+    }
+
+    .auth-nav-link:hover { color: rgba(255,255,255,0.7); }
+
+    .auth-nav-link.active {
+        color: white;
+        font-weight: 600;
+        border-bottom: 2px solid var(--accent);
+        border-radius: 0;
+        padding-bottom: 4px;
+    }
+
+    .auth-nav-badge {
+        font-size: 0.65rem;
+        color: rgba(255,255,255,0.35);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    /* ── Gold Rule ── */
+    .auth-gold-rule {
+        height: 2px;
+        background: linear-gradient(90deg, var(--accent), #b8872e, var(--accent));
+        flex-shrink: 0;
+    }
+
+    /* ── Body ── */
+    .auth-body {
+        flex: 1;
+        display: grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        min-height: calc(100vh - 58px);
+    }
+
+    /* ── Left: Form ── */
+    .auth-left {
+        padding: 44px 64px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        border-right: 1px solid #e0d8cc;
+        overflow-y: auto;
+    }
+
+    .auth-eyebrow {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: var(--accent);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        margin-bottom: 10px;
+    }
+
+    .auth-eyebrow::before {
+        content: '';
+        width: 20px;
+        height: 1.5px;
+        background: var(--accent);
+        flex-shrink: 0;
+    }
+
+    .auth-headline {
+        font-family: var(--font-heading);
+        font-size: 1.8rem;
+        color: var(--text-primary);
+        line-height: 1.15;
+        margin-bottom: 10px;
+        letter-spacing: -0.3px;
+    }
+
+    .auth-deck {
+        font-size: 0.875rem;
+        color: var(--text-muted);
+        line-height: 1.7;
+        margin-bottom: 28px;
+        padding-bottom: 24px;
+        border-bottom: 1px solid #e0d8cc;
+    }
+
+    /* Two column grid for form */
+    .form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0 20px;
+    }
+
+    .form-grid .auth-field.full {
+        grid-column: 1 / -1;
+    }
+
+    .auth-field {
+        margin-bottom: 20px;
+    }
+
+    .auth-field-label {
+        display: block;
+        font-size: 0.68rem;
+        font-weight: 700;
+        color: var(--text-muted);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        margin-bottom: 7px;
+    }
+
+    .auth-field-label span {
+        color: var(--error);
+        margin-left: 2px;
+    }
+
+    .auth-field-input {
+        width: 100%;
+        height: 42px;
+        background: white;
+        border: 1.5px solid #e0d8cc;
+        border-radius: 8px;
+        padding: 0 14px;
+        font-size: 0.875rem;
+        color: var(--text-primary);
+        font-family: var(--font-body);
+        outline: none;
+        transition: all 0.2s;
+    }
+
+    .auth-field-input:focus {
+        border-color: var(--navy);
+        box-shadow: 0 0 0 3px rgba(44,74,110,0.07);
+    }
+
+    .auth-field-input::placeholder { color: #c4b89e; }
+
+    .auth-field-hint {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        margin-top: 4px;
+    }
+
+    .auth-btn {
+        width: 100%;
+        height: 46px;
+        background: var(--navy);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-family: var(--font-body);
+        font-size: 0.9rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        cursor: pointer;
+        transition: all 0.2s;
+        margin-top: 4px;
+    }
+
+    .auth-btn:hover {
+        background: var(--navy-light);
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px rgba(44,74,110,0.25);
+    }
+
+    .auth-login {
+        margin-top: 16px;
+        font-size: 0.825rem;
+        color: var(--text-muted);
+        text-align: center;
+    }
+
+    .auth-login a {
+        color: var(--navy);
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .auth-login a:hover { color: var(--accent); }
+
+    .auth-legal {
+        margin-top: 20px;
+        padding-top: 16px;
+        border-top: 1px solid #e8e4dc;
+        font-size: 0.7rem;
+        color: #b0a080;
+        line-height: 1.6;
+        text-align: center;
+    }
+
+    .auth-legal a {
+        color: var(--navy);
+        text-decoration: underline;
+    }
+
+    /* ── Right Panel ── */
+    .auth-right {
+        background: var(--navy);
+        padding: 56px 52px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .auth-right::before {
+        content: '';
+        position: absolute;
+        top: -80px; right: -80px;
+        width: 280px; height: 280px;
+        background: rgba(212,168,83,0.06);
+        border-radius: 50%;
+    }
+
+    .auth-right::after {
+        content: '';
+        position: absolute;
+        bottom: -60px; left: -60px;
+        width: 200px; height: 200px;
+        background: rgba(255,255,255,0.02);
+        border-radius: 50%;
+    }
+
+    .auth-right-content {
+        position: relative;
+        z-index: 1;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+
+    .auth-quote {
+        border-left: 3px solid var(--accent);
+        padding-left: 20px;
+        margin-bottom: 36px;
+    }
+
+    .auth-quote-text {
+        font-family: var(--font-heading);
+        font-size: 1.05rem;
+        font-style: italic;
+        color: rgba(255,255,255,0.65);
+        line-height: 1.6;
+        margin-bottom: 10px;
+    }
+
+    .auth-quote-author {
+        font-size: 0.75rem;
+        color: rgba(255,255,255,0.3);
+        letter-spacing: 0.06em;
+    }
+
+    .auth-steps {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+    }
+
+    .auth-step {
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+        padding: 16px 0;
+        border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+
+    .auth-step:last-child { border-bottom: none; }
+
+    .auth-step-num {
+        font-family: var(--font-heading);
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: var(--accent);
+        line-height: 1;
+        min-width: 28px;
+        padding-top: 2px;
+        flex-shrink: 0;
+    }
+
+    .auth-step-body {}
+
+    .auth-step-title {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: white;
+        margin-bottom: 3px;
+    }
+
+    .auth-step-desc {
+        font-size: 0.75rem;
+        color: rgba(255,255,255,0.35);
+        line-height: 1.5;
+    }
+
+    .auth-right-bottom {
+        position: relative;
+        z-index: 1;
+        padding-top: 24px;
+        border-top: 1px solid rgba(255,255,255,0.08);
+        margin-top: 24px;
+    }
+
+    .auth-right-tagline {
+        font-family: var(--font-heading);
+        font-size: 0.9rem;
+        color: rgba(255,255,255,0.3);
+        font-style: italic;
+        margin-bottom: 4px;
+    }
+
+    .auth-right-sub {
+        font-size: 0.7rem;
+        color: rgba(255,255,255,0.18);
+        letter-spacing: 0.06em;
+    }
+
+    /* ── Searchable Country Dropdown ── */
+    .country-dropdown {
+        position: relative;
+        width: 100%;
+    }
+
+    .country-selected {
+        height: 42px;
+        background: white;
+        border: 1.5px solid #e0d8cc;
+        border-radius: 8px;
+        padding: 0 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        font-size: 0.85rem;
+        color: var(--text-primary);
+        font-family: var(--font-body);
+        transition: border-color 0.2s;
+        user-select: none;
+    }
+
+    .country-selected:hover {
+        border-color: var(--navy);
+    }
+
+    .country-arrow {
+        margin-left: auto;
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        transition: transform 0.2s;
+    }
+
+    .country-dropdown.open .country-arrow {
+        transform: rotate(180deg);
+    }
+
+    .country-panel {
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        width: 280px;
+        background: white;
+        border: 1.5px solid #e0d8cc;
+        border-radius: 8px;
+        box-shadow: 0 8px 24px rgba(26,26,46,0.12);
+        z-index: 1000;
+        display: none;
+        overflow: hidden;
+    }
+
+    .country-dropdown.open .country-panel {
+        display: block;
+    }
+
+    .country-search-wrap {
+        padding: 10px 10px 6px;
+        border-bottom: 1px solid #f0ece4;
+    }
+
+    .country-search-input {
+        width: 100%;
+        height: 34px;
+        background: #f7f3eb;
+        border: 1px solid #e0d8cc;
+        border-radius: 6px;
+        padding: 0 10px;
+        font-size: 0.825rem;
+        color: var(--text-primary);
+        font-family: var(--font-body);
+        outline: none;
+    }
+
+    .country-search-input:focus {
+        border-color: var(--navy);
+    }
+
+    .country-list {
+        max-height: 220px;
+        overflow-y: auto;
+    }
+
+    .country-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 12px;
+        cursor: pointer;
+        font-size: 0.825rem;
+        color: var(--text-primary);
+        font-family: var(--font-body);
+        transition: background 0.1s;
+    }
+
+    .country-item:hover {
+        background: #f7f3eb;
+    }
+
+    .country-item.selected {
+        background: #eef2f7;
+        color: var(--navy);
+        font-weight: 600;
+    }
+
+    .country-item-flag { font-size: 1rem; flex-shrink: 0; }
+    .country-item-name { flex: 1; font-size: 0.8rem; color: var(--text-muted); }
+    .country-item-code { font-weight: 600; color: var(--text-primary); font-size: 0.8rem; }
+
+    .country-no-results {
+        padding: 16px 12px;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        text-align: center;
+    }
+/* ── Animated steps ── */
+    .auth-quote {
+        opacity: 0;
+        animation: slideUp 0.5s ease forwards;
+        animation-delay: 0s;
+    }
+
+    .auth-step {
+        opacity: 0;
+        animation: slideUp 0.5s ease forwards;
+    }
+
+    .auth-step:nth-child(1) { animation-delay: 0.2s; }
+    .auth-step:nth-child(2) { animation-delay: 0.4s; }
+    .auth-step:nth-child(3) { animation-delay: 0.6s; }
+    .auth-step:nth-child(4) { animation-delay: 0.8s; }
+
+    .auth-right-bottom {
+        opacity: 0;
+        animation: slideUp 0.5s ease forwards;
+        animation-delay: 1s;
+    }
+
+    @keyframes slideUp {
+        from {
+            opacity: 0;
+            transform: translateY(16px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="auth-page">
-    <div class="auth-container">
+<div class="auth-wrapper">
 
-        <!-- ── Logo ────────────────────────────────── -->
-        <div class="auth-logo">
-            <div class="auth-logo-text">
-                Advisor<span>Nest</span>
-            </div>
-            <div class="auth-logo-tagline">
-                Where great portfolios are built
-            </div>
+    <!-- ── Navy Navbar ── -->
+    <div class="auth-nav">
+        <div class="auth-nav-logo">
+            Advisor<span>Nest</span>
         </div>
+        <div class="auth-nav-links">
+            <a href="{{ url_for('main.login') }}"
+               class="auth-nav-link">Log In</a>
+            <a href="{{ url_for('main.register') }}"
+               class="auth-nav-link active">Register</a>
+        </div>
+        <div class="auth-nav-badge">
+            For Licensed Advisors Only
+        </div>
+    </div>
 
-        <!-- ── Register Card ────────────────────────── -->
-        <div class="auth-card">
+    <!-- ── Gold Rule ── -->
+    <div class="auth-gold-rule"></div>
 
-            <h1 class="auth-title">Create your account</h1>
-            <p class="auth-subtitle">
-                Join AdvisorNest — built for independent financial advisors
-            </p>
+    <!-- ── Body ── -->
+    <div class="auth-body">
+
+        <!-- ── Left: Form ── -->
+        <div class="auth-left">
+
+            <div class="auth-eyebrow">Create Your Account</div>
+
+            <div class="auth-headline">
+                Join AdvisorNest today
+            </div>
+
+            <div class="auth-deck">
+                Built exclusively for independent financial advisors.
+                Create your free account and start generating AI-powered
+                portfolio recommendations in minutes.
+            </div>
 
             <form method="POST" action="{{ url_for('main.register') }}">
 
-                <!-- Full Name -->
-                <div class="form-group">
-                    <label class="form-label" for="full_name">
-                        Full Name <span style="color:var(--error)">*</span>
-                    </label>
-                    <input
-                        type="text"
-                        id="full_name"
-                        name="full_name"
-                        class="form-input"
-                        placeholder="e.g. Sarah Johnson"
-                        required
-                        autocomplete="name"
-                    >
-                </div>
+                <div class="form-grid">
 
-                <!-- Firm Name -->
-                <div class="form-group">
-                    <label class="form-label" for="firm_name">
-                        Firm Name
-                    </label>
-                    <input
-                        type="text"
-                        id="firm_name"
-                        name="firm_name"
-                        class="form-input"
-                        placeholder="e.g. Johnson Wealth Management"
-                        autocomplete="organization"
-                    >
-                    <div class="form-hint">
-                        Optional — leave blank if independent
+                   <!-- Full Name -->
+                    <div class="auth-field">
+                        <label class="auth-field-label" for="full_name">
+                            Full Name <span>*</span>
+                        </label>
+                        <input
+                            type="text"
+                            id="full_name"
+                            name="full_name"
+                            class="auth-field-input"
+                            placeholder="e.g. Sarah Johnson"
+                            required
+                            autocomplete="name"
+                        >
                     </div>
-                </div>
 
-                <!-- Email -->
-                <div class="form-group">
-                    <label class="form-label" for="email">
-                        Email Address <span style="color:var(--error)">*</span>
-                    </label>
-                    <input
-                        type="email"
-                        id="email"
-                        name="email"
-                        class="form-input"
-                        placeholder="you@yourfirm.com"
-                        required
-                        autocomplete="email"
-                    >
-                </div>
-
-                <!-- Password -->
-                <div class="form-group">
-                    <label class="form-label" for="password">
-                        Password <span style="color:var(--error)">*</span>
-                    </label>
-                    <input
-                        type="password"
-                        id="password"
-                        name="password"
-                        class="form-input"
-                        placeholder="Minimum 8 characters"
-                        required
-                        minlength="8"
-                        autocomplete="new-password"
-                    >
-                    <div class="form-hint">
-                        Must be at least 8 characters
+                    <!-- Firm Name -->
+                    <div class="auth-field">
+                        <label class="auth-field-label" for="firm_name">
+                            Firm Name
+                        </label>
+                        <input
+                            type="text"
+                            id="firm_name"
+                            name="firm_name"
+                            class="auth-field-input"
+                            placeholder="e.g. Johnson Wealth Mgmt"
+                            autocomplete="organization"
+                        >
                     </div>
+
+                    <!-- Phone Number -->
+                    <div class="auth-field full">
+                        <label class="auth-field-label" for="phone">
+                            Phone Number
+                        </label>
+                        <div style="display:grid;grid-template-columns:170px 1fr;gap:8px;position:relative">
+
+                            <!-- Custom searchable country dropdown -->
+                            <div class="country-dropdown" id="countryDropdown">
+                                <div class="country-selected" id="countrySelected" onclick="toggleDropdown()">
+                                    <span id="countryFlag">🇺🇸</span>
+                                    <span id="countryCode">+1 (US)</span>
+                                    <span class="country-arrow">▾</span>
+                                </div>
+                                <div class="country-panel" id="countryPanel">
+                                    <div class="country-search-wrap">
+                                        <input
+                                            type="text"
+                                            id="countrySearch"
+                                            class="country-search-input"
+                                            placeholder="Search country..."
+                                            oninput="filterCountries(this.value)"
+                                            autocomplete="off"
+                                        >
+                                    </div>
+                                    <div class="country-list" id="countryList"></div>
+                                </div>
+                            </div>
+
+                            <!-- Hidden input to store selected code -->
+                            <input type="hidden" name="country_code" id="countryCodeValue" value="+1">
+
+                            <input
+                                type="tel"
+                                id="phone"
+                                name="phone"
+                                class="auth-field-input"
+                                placeholder="(555) 000-0000"
+                                autocomplete="tel"
+                            >
+                        </div>
+                        <div class="auth-field-hint">
+                            Optional — used for account recovery only
+                        </div>
+                    </div>
+                    <!-- Email -->
+                    <div class="auth-field full">
+                        <label class="auth-field-label" for="email">
+                            Email Address <span>*</span>
+                        </label>
+                        <input
+                            type="email"
+                            id="email"
+                            name="email"
+                            class="auth-field-input"
+                            placeholder="you@yourfirm.com"
+                            required
+                            autocomplete="email"
+                        >
+                    </div>
+
+                    <!-- Password -->
+                    <div class="auth-field">
+                        <label class="auth-field-label" for="password">
+                            Password <span>*</span>
+                        </label>
+                        <input
+                            type="password"
+                            id="password"
+                            name="password"
+                            class="auth-field-input"
+                            placeholder="Min. 8 characters"
+                            required
+                            minlength="8"
+                            autocomplete="new-password"
+                        >
+                        <div class="auth-field-hint">
+                            At least 8 characters
+                        </div>
+                    </div>
+
+                    <!-- Confirm Password -->
+                    <div class="auth-field">
+                        <label class="auth-field-label" for="confirm_password">
+                            Confirm Password <span>*</span>
+                        </label>
+                        <input
+                            type="password"
+                            id="confirm_password"
+                            name="confirm_password"
+                            class="auth-field-input"
+                            placeholder="Repeat your password"
+                            required
+                            autocomplete="new-password"
+                        >
+                    </div>
+
                 </div>
 
-                <!-- Confirm Password -->
-                <div class="form-group">
-                    <label class="form-label" for="confirm_password">
-                        Confirm Password <span style="color:var(--error)">*</span>
-                    </label>
-                    <input
-                        type="password"
-                        id="confirm_password"
-                        name="confirm_password"
-                        class="form-input"
-                        placeholder="Repeat your password"
-                        required
-                        autocomplete="new-password"
-                    >
-                </div>
-
-                <!-- Submit -->
-                <button
-                    type="submit"
-                    class="btn btn-primary btn-full mt-md"
-                >
-                    Create My Account
+                <button type="submit" class="auth-btn">
+                    Create My AdvisorNest Account
                 </button>
 
             </form>
 
-            <!-- Divider -->
-            <div class="divider mt-xl">
-                <div class="divider-line"></div>
-                <div class="divider-label">Already have an account?</div>
-                <div class="divider-line"></div>
+            <div class="auth-login">
+                Already have an account?
+                <a href="{{ url_for('main.login') }}">
+                    Log in instead →
+                </a>
             </div>
 
-            <!-- Login link -->
-            
-                href="{{ url_for('main.login') }}"
-                class="btn btn-outline btn-full"
-            >
-                Log In Instead
-            </a>
+            <div class="auth-legal">
+                For licensed financial advisors only.<br>
+                By registering you agree to our
+                <a href="#">Terms of Service</a> and
+                <a href="#">Privacy Policy</a>.
+            </div>
 
         </div>
 
-        <!-- Footer note -->
-        <div class="auth-footer mt-lg">
-            <p>
-                For licensed financial advisors only.
-                <br>
-                By registering you agree to our
-                <a href="#">Terms of Service</a>
-                and
-                <a href="#">Privacy Policy</a>.
-            </p>
+        <!-- ── Right: Navy Panel ── -->
+        <div class="auth-right">
+            <div class="auth-right-content">
+
+                <div>
+                    <div class="auth-quote">
+                        <div class="auth-quote-text">
+                            "Independent advisors deserve the same
+                            tools as large firms. AdvisorNest was
+                            built to make that possible."
+                        </div>
+                        <div class="auth-quote-author">
+                            — AdvisorNest, 2026
+                        </div>
+                    </div>
+
+                    <div class="auth-steps">
+
+                        <div class="auth-step">
+                            <div class="auth-step-num">01</div>
+                            <div class="auth-step-body">
+                                <div class="auth-step-title">
+                                    Create your account
+                                </div>
+                                <div class="auth-step-desc">
+                                    Fill in your details and create your
+                                    secure advisor account in under a minute.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="auth-step">
+                            <div class="auth-step-num">02</div>
+                            <div class="auth-step-body">
+                                <div class="auth-step-title">
+                                    Enter a client profile
+                                </div>
+                                <div class="auth-step-desc">
+                                    Input risk tolerance, investment amount,
+                                    age, and time horizon for any client.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="auth-step">
+                            <div class="auth-step-num">03</div>
+                            <div class="auth-step-body">
+                                <div class="auth-step-title">
+                                    Get AI-powered allocation
+                                </div>
+                                <div class="auth-step-desc">
+                                    Receive a complete portfolio recommendation
+                                    with live market data in seconds.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="auth-step">
+                            <div class="auth-step-num">04</div>
+                            <div class="auth-step-body">
+                                <div class="auth-step-title">
+                                    Download the PDF report
+                                </div>
+                                <div class="auth-step-desc">
+                                    Hand a branded, professional PDF directly
+                                    to your client — ready to present.
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div class="auth-right-bottom">
+                    <div class="auth-right-tagline">
+                        Where great portfolios are built
+                    </div>
+                    <div class="auth-right-sub">
+                        AdvisorNest · 2026 · For Licensed Financial Advisors
+                    </div>
+                </div>
+
+            </div>
         </div>
 
     </div>
+
 </div>
+{% block extra_js %}
+<script>
+const COUNTRIES = [
+    {flag:"🇦🇫",name:"Afghanistan",code:"+93"},
+    {flag:"🇦🇱",name:"Albania",code:"+355"},
+    {flag:"🇩🇿",name:"Algeria",code:"+213"},
+    {flag:"🇦🇩",name:"Andorra",code:"+376"},
+    {flag:"🇦🇴",name:"Angola",code:"+244"},
+    {flag:"🇦🇬",name:"Antigua & Barbuda",code:"+1-268"},
+    {flag:"🇦🇷",name:"Argentina",code:"+54"},
+    {flag:"🇦🇲",name:"Armenia",code:"+374"},
+    {flag:"🇦🇺",name:"Australia",code:"+61"},
+    {flag:"🇦🇹",name:"Austria",code:"+43"},
+    {flag:"🇦🇿",name:"Azerbaijan",code:"+994"},
+    {flag:"🇧🇸",name:"Bahamas",code:"+1-242"},
+    {flag:"🇧🇭",name:"Bahrain",code:"+973"},
+    {flag:"🇧🇩",name:"Bangladesh",code:"+880"},
+    {flag:"🇧🇧",name:"Barbados",code:"+1-246"},
+    {flag:"🇧🇾",name:"Belarus",code:"+375"},
+    {flag:"🇧🇪",name:"Belgium",code:"+32"},
+    {flag:"🇧🇿",name:"Belize",code:"+501"},
+    {flag:"🇧🇯",name:"Benin",code:"+229"},
+    {flag:"🇧🇹",name:"Bhutan",code:"+975"},
+    {flag:"🇧🇴",name:"Bolivia",code:"+591"},
+    {flag:"🇧🇦",name:"Bosnia & Herzegovina",code:"+387"},
+    {flag:"🇧🇼",name:"Botswana",code:"+267"},
+    {flag:"🇧🇷",name:"Brazil",code:"+55"},
+    {flag:"🇧🇳",name:"Brunei",code:"+673"},
+    {flag:"🇧🇬",name:"Bulgaria",code:"+359"},
+    {flag:"🇧🇫",name:"Burkina Faso",code:"+226"},
+    {flag:"🇧🇮",name:"Burundi",code:"+257"},
+    {flag:"🇨🇻",name:"Cabo Verde",code:"+238"},
+    {flag:"🇰🇭",name:"Cambodia",code:"+855"},
+    {flag:"🇨🇲",name:"Cameroon",code:"+237"},
+    {flag:"🇨🇦",name:"Canada",code:"+1"},
+    {flag:"🇨🇫",name:"Central African Republic",code:"+236"},
+    {flag:"🇹🇩",name:"Chad",code:"+235"},
+    {flag:"🇨🇱",name:"Chile",code:"+56"},
+    {flag:"🇨🇳",name:"China",code:"+86"},
+    {flag:"🇨🇴",name:"Colombia",code:"+57"},
+    {flag:"🇰🇲",name:"Comoros",code:"+269"},
+    {flag:"🇨🇬",name:"Congo",code:"+242"},
+    {flag:"🇨🇩",name:"Congo (DRC)",code:"+243"},
+    {flag:"🇨🇷",name:"Costa Rica",code:"+506"},
+    {flag:"🇭🇷",name:"Croatia",code:"+385"},
+    {flag:"🇨🇺",name:"Cuba",code:"+53"},
+    {flag:"🇨🇾",name:"Cyprus",code:"+357"},
+    {flag:"🇨🇿",name:"Czech Republic",code:"+420"},
+    {flag:"🇩🇰",name:"Denmark",code:"+45"},
+    {flag:"🇩🇯",name:"Djibouti",code:"+253"},
+    {flag:"🇩🇲",name:"Dominica",code:"+1-767"},
+    {flag:"🇩🇴",name:"Dominican Republic",code:"+1-809"},
+    {flag:"🇪🇨",name:"Ecuador",code:"+593"},
+    {flag:"🇪🇬",name:"Egypt",code:"+20"},
+    {flag:"🇸🇻",name:"El Salvador",code:"+503"},
+    {flag:"🇬🇶",name:"Equatorial Guinea",code:"+240"},
+    {flag:"🇪🇷",name:"Eritrea",code:"+291"},
+    {flag:"🇪🇪",name:"Estonia",code:"+372"},
+    {flag:"🇸🇿",name:"Eswatini",code:"+268"},
+    {flag:"🇪🇹",name:"Ethiopia",code:"+251"},
+    {flag:"🇫🇯",name:"Fiji",code:"+679"},
+    {flag:"🇫🇮",name:"Finland",code:"+358"},
+    {flag:"🇫🇷",name:"France",code:"+33"},
+    {flag:"🇬🇦",name:"Gabon",code:"+241"},
+    {flag:"🇬🇲",name:"Gambia",code:"+220"},
+    {flag:"🇬🇪",name:"Georgia",code:"+995"},
+    {flag:"🇩🇪",name:"Germany",code:"+49"},
+    {flag:"🇬🇭",name:"Ghana",code:"+233"},
+    {flag:"🇬🇷",name:"Greece",code:"+30"},
+    {flag:"🇬🇩",name:"Grenada",code:"+1-473"},
+    {flag:"🇬🇹",name:"Guatemala",code:"+502"},
+    {flag:"🇬🇳",name:"Guinea",code:"+224"},
+    {flag:"🇬🇼",name:"Guinea-Bissau",code:"+245"},
+    {flag:"🇬🇾",name:"Guyana",code:"+592"},
+    {flag:"🇭🇹",name:"Haiti",code:"+509"},
+    {flag:"🇭🇳",name:"Honduras",code:"+504"},
+    {flag:"🇭🇰",name:"Hong Kong",code:"+852"},
+    {flag:"🇭🇺",name:"Hungary",code:"+36"},
+    {flag:"🇮🇸",name:"Iceland",code:"+354"},
+    {flag:"🇮🇳",name:"India",code:"+91"},
+    {flag:"🇮🇩",name:"Indonesia",code:"+62"},
+    {flag:"🇮🇷",name:"Iran",code:"+98"},
+    {flag:"🇮🇶",name:"Iraq",code:"+964"},
+    {flag:"🇮🇪",name:"Ireland",code:"+353"},
+    {flag:"🇮🇱",name:"Israel",code:"+972"},
+    {flag:"🇮🇹",name:"Italy",code:"+39"},
+    {flag:"🇯🇲",name:"Jamaica",code:"+1-876"},
+    {flag:"🇯🇵",name:"Japan",code:"+81"},
+    {flag:"🇯🇴",name:"Jordan",code:"+962"},
+    {flag:"🇰🇿",name:"Kazakhstan",code:"+7"},
+    {flag:"🇰🇪",name:"Kenya",code:"+254"},
+    {flag:"🇰🇮",name:"Kiribati",code:"+686"},
+    {flag:"🇰🇵",name:"North Korea",code:"+850"},
+    {flag:"🇰🇷",name:"South Korea",code:"+82"},
+    {flag:"🇽🇰",name:"Kosovo",code:"+383"},
+    {flag:"🇰🇼",name:"Kuwait",code:"+965"},
+    {flag:"🇰🇬",name:"Kyrgyzstan",code:"+996"},
+    {flag:"🇱🇦",name:"Laos",code:"+856"},
+    {flag:"🇱🇻",name:"Latvia",code:"+371"},
+    {flag:"🇱🇧",name:"Lebanon",code:"+961"},
+    {flag:"🇱🇸",name:"Lesotho",code:"+266"},
+    {flag:"🇱🇷",name:"Liberia",code:"+231"},
+    {flag:"🇱🇾",name:"Libya",code:"+218"},
+    {flag:"🇱🇮",name:"Liechtenstein",code:"+423"},
+    {flag:"🇱🇹",name:"Lithuania",code:"+370"},
+    {flag:"🇱🇺",name:"Luxembourg",code:"+352"},
+    {flag:"🇲🇴",name:"Macau",code:"+853"},
+    {flag:"🇲🇬",name:"Madagascar",code:"+261"},
+    {flag:"🇲🇼",name:"Malawi",code:"+265"},
+    {flag:"🇲🇾",name:"Malaysia",code:"+60"},
+    {flag:"🇲🇻",name:"Maldives",code:"+960"},
+    {flag:"🇲🇱",name:"Mali",code:"+223"},
+    {flag:"🇲🇹",name:"Malta",code:"+356"},
+    {flag:"🇲🇭",name:"Marshall Islands",code:"+692"},
+    {flag:"🇲🇷",name:"Mauritania",code:"+222"},
+    {flag:"🇲🇺",name:"Mauritius",code:"+230"},
+    {flag:"🇲🇽",name:"Mexico",code:"+52"},
+    {flag:"🇫🇲",name:"Micronesia",code:"+691"},
+    {flag:"🇲🇩",name:"Moldova",code:"+373"},
+    {flag:"🇲🇨",name:"Monaco",code:"+377"},
+    {flag:"🇲🇳",name:"Mongolia",code:"+976"},
+    {flag:"🇲🇪",name:"Montenegro",code:"+382"},
+    {flag:"🇲🇦",name:"Morocco",code:"+212"},
+    {flag:"🇲🇿",name:"Mozambique",code:"+258"},
+    {flag:"🇲🇲",name:"Myanmar",code:"+95"},
+    {flag:"🇳🇦",name:"Namibia",code:"+264"},
+    {flag:"🇳🇷",name:"Nauru",code:"+674"},
+    {flag:"🇳🇵",name:"Nepal",code:"+977"},
+    {flag:"🇳🇱",name:"Netherlands",code:"+31"},
+    {flag:"🇳🇿",name:"New Zealand",code:"+64"},
+    {flag:"🇳🇮",name:"Nicaragua",code:"+505"},
+    {flag:"🇳🇪",name:"Niger",code:"+227"},
+    {flag:"🇳🇬",name:"Nigeria",code:"+234"},
+    {flag:"🇲🇰",name:"North Macedonia",code:"+389"},
+    {flag:"🇳🇴",name:"Norway",code:"+47"},
+    {flag:"🇴🇲",name:"Oman",code:"+968"},
+    {flag:"🇵🇰",name:"Pakistan",code:"+92"},
+    {flag:"🇵🇼",name:"Palau",code:"+680"},
+    {flag:"🇵🇸",name:"Palestine",code:"+970"},
+    {flag:"🇵🇦",name:"Panama",code:"+507"},
+    {flag:"🇵🇬",name:"Papua New Guinea",code:"+675"},
+    {flag:"🇵🇾",name:"Paraguay",code:"+595"},
+    {flag:"🇵🇪",name:"Peru",code:"+51"},
+    {flag:"🇵🇭",name:"Philippines",code:"+63"},
+    {flag:"🇵🇱",name:"Poland",code:"+48"},
+    {flag:"🇵🇹",name:"Portugal",code:"+351"},
+    {flag:"🇶🇦",name:"Qatar",code:"+974"},
+    {flag:"🇷🇴",name:"Romania",code:"+40"},
+    {flag:"🇷🇺",name:"Russia",code:"+7"},
+    {flag:"🇷🇼",name:"Rwanda",code:"+250"},
+    {flag:"🇰🇳",name:"Saint Kitts & Nevis",code:"+1-869"},
+    {flag:"🇱🇨",name:"Saint Lucia",code:"+1-758"},
+    {flag:"🇻🇨",name:"Saint Vincent",code:"+1-784"},
+    {flag:"🇼🇸",name:"Samoa",code:"+685"},
+    {flag:"🇸🇲",name:"San Marino",code:"+378"},
+    {flag:"🇸🇹",name:"Sao Tome & Principe",code:"+239"},
+    {flag:"🇸🇦",name:"Saudi Arabia",code:"+966"},
+    {flag:"🇸🇳",name:"Senegal",code:"+221"},
+    {flag:"🇷🇸",name:"Serbia",code:"+381"},
+    {flag:"🇸🇨",name:"Seychelles",code:"+248"},
+    {flag:"🇸🇱",name:"Sierra Leone",code:"+232"},
+    {flag:"🇸🇬",name:"Singapore",code:"+65"},
+    {flag:"🇸🇰",name:"Slovakia",code:"+421"},
+    {flag:"🇸🇮",name:"Slovenia",code:"+386"},
+    {flag:"🇸🇧",name:"Solomon Islands",code:"+677"},
+    {flag:"🇸🇴",name:"Somalia",code:"+252"},
+    {flag:"🇿🇦",name:"South Africa",code:"+27"},
+    {flag:"🇸🇸",name:"South Sudan",code:"+211"},
+    {flag:"🇪🇸",name:"Spain",code:"+34"},
+    {flag:"🇱🇰",name:"Sri Lanka",code:"+94"},
+    {flag:"🇸🇩",name:"Sudan",code:"+249"},
+    {flag:"🇸🇷",name:"Suriname",code:"+597"},
+    {flag:"🇸🇪",name:"Sweden",code:"+46"},
+    {flag:"🇨🇭",name:"Switzerland",code:"+41"},
+    {flag:"🇸🇾",name:"Syria",code:"+963"},
+    {flag:"🇹🇼",name:"Taiwan",code:"+886"},
+    {flag:"🇹🇯",name:"Tajikistan",code:"+992"},
+    {flag:"🇹🇿",name:"Tanzania",code:"+255"},
+    {flag:"🇹🇭",name:"Thailand",code:"+66"},
+    {flag:"🇹🇱",name:"Timor-Leste",code:"+670"},
+    {flag:"🇹🇬",name:"Togo",code:"+228"},
+    {flag:"🇹🇴",name:"Tonga",code:"+676"},
+    {flag:"🇹🇹",name:"Trinidad & Tobago",code:"+1-868"},
+    {flag:"🇹🇳",name:"Tunisia",code:"+216"},
+    {flag:"🇹🇷",name:"Turkey",code:"+90"},
+    {flag:"🇹🇲",name:"Turkmenistan",code:"+993"},
+    {flag:"🇹🇻",name:"Tuvalu",code:"+688"},
+    {flag:"🇺🇬",name:"Uganda",code:"+256"},
+    {flag:"🇺🇦",name:"Ukraine",code:"+380"},
+    {flag:"🇦🇪",name:"United Arab Emirates",code:"+971"},
+    {flag:"🇬🇧",name:"United Kingdom",code:"+44"},
+    {flag:"🇺🇸",name:"United States",code:"+1"},
+    {flag:"🇺🇾",name:"Uruguay",code:"+598"},
+    {flag:"🇺🇿",name:"Uzbekistan",code:"+998"},
+    {flag:"🇻🇺",name:"Vanuatu",code:"+678"},
+    {flag:"🇻🇦",name:"Vatican City",code:"+39"},
+    {flag:"🇻🇪",name:"Venezuela",code:"+58"},
+    {flag:"🇻🇳",name:"Vietnam",code:"+84"},
+    {flag:"🇾🇪",name:"Yemen",code:"+967"},
+    {flag:"🇿🇲",name:"Zambia",code:"+260"},
+    {flag:"🇿🇼",name:"Zimbabwe",code:"+263"},
+];
+
+let filteredCountries = [...COUNTRIES];
+let selectedIndex = -1;
+
+function renderList(list) {
+    const container = document.getElementById('countryList');
+    if (list.length === 0) {
+        container.innerHTML = '<div class="country-no-results">No countries found</div>';
+        return;
+    }
+    container.innerHTML = list.map((c, i) => `
+        <div class="country-item ${i === selectedIndex ? 'selected' : ''}"
+             onclick="selectCountry('${c.flag}', '${c.name}', '${c.code}')"
+             data-index="${i}">
+            <span class="country-item-flag">${c.flag}</span>
+            <span class="country-item-name">${c.name}</span>
+            <span class="country-item-code">${c.code}</span>
+        </div>
+    `).join('');
+}
+
+function filterCountries(query) {
+    selectedIndex = -1;
+    if (!query) {
+        filteredCountries = [...COUNTRIES];
+    } else {
+        const q = query.toLowerCase();
+        filteredCountries = COUNTRIES.filter(c => {
+            // Match start of country name — "In" → India, Indonesia
+            if (c.name.toLowerCase().startsWith(q)) return true;
+            // Match dial code — "+91" or "91"
+            if (c.code.startsWith(query) || c.code.startsWith("+" + query)) return true;
+            // Match any word in country name — "US" → "United States", "GB" → "Great Britain"
+            const words = c.name.toLowerCase().split(/[\s\-&,()]+/);
+            if (words.some(w => w.startsWith(q))) return true;
+            // Match abbreviation from initials — "UAE" → "United Arab Emirates"
+            const initials = c.name.split(/[\s\-&,()]+/)
+                .filter(w => w.length > 0)
+                .map(w => w[0].toLowerCase())
+                .join('');
+            if (initials.startsWith(q)) return true;
+            return false;
+        });
+    }
+    renderList(filteredCountries);
+}
+function selectCountry(flag, name, code) {
+    document.getElementById('countryFlag').textContent = flag;
+    document.getElementById('countryCode').textContent = code;
+    document.getElementById('countryCodeValue').value = code;
+    document.getElementById('countrySearch').value = '';
+    filteredCountries = [...COUNTRIES];
+    renderList(filteredCountries);
+    closeDropdown();
+}
+
+function toggleDropdown() {
+    const dd = document.getElementById('countryDropdown');
+    const isOpen = dd.classList.contains('open');
+    if (isOpen) {
+        closeDropdown();
+    } else {
+        dd.classList.add('open');
+        setTimeout(() => {
+            document.getElementById('countrySearch').focus();
+        }, 50);
+    }
+}
+
+function closeDropdown() {
+    document.getElementById('countryDropdown').classList.remove('open');
+    selectedIndex = -1;
+}
+
+// Keyboard navigation
+document.addEventListener('keydown', function(e) {
+    const panel = document.getElementById('countryPanel');
+    if (!document.getElementById('countryDropdown').classList.contains('open')) return;
+
+    const items = document.querySelectorAll('.country-item');
+
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        selectedIndex = Math.min(selectedIndex + 1, filteredCountries.length - 1);
+        renderList(filteredCountries);
+        document.querySelectorAll('.country-item')[selectedIndex]?.scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        selectedIndex = Math.max(selectedIndex - 1, 0);
+        renderList(filteredCountries);
+        document.querySelectorAll('.country-item')[selectedIndex]?.scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter' && selectedIndex >= 0) {
+        e.preventDefault();
+        const c = filteredCountries[selectedIndex];
+        if (c) selectCountry(c.flag, c.name, c.code);
+    } else if (e.key === 'Escape') {
+        closeDropdown();
+    }
+});
+
+// Close when clicking outside
+document.addEventListener('click', function(e) {
+    if (!document.getElementById('countryDropdown').contains(e.target)) {
+        closeDropdown();
+    }
+});
+
+// Init
+renderList(COUNTRIES);
+</script>
+{% endblock %}
 {% endblock %}

@@ -1,0 +1,317 @@
+{% extends "base.html" %}
+
+{% block title %}Complete Your Profile — AdvisorNest{% endblock %}
+
+{% block extra_css %}
+<style>
+    .navbar { display: none; }
+    .footer { display: none; }
+    .main-content { padding: 0; max-width: 100%; }
+    * { box-sizing: border-box; }
+
+    .auth-wrapper {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background: #f7f3eb;
+    }
+
+    .auth-nav {
+        background: var(--navy);
+        padding: 0 52px;
+        display: flex;
+        align-items: center;
+        height: 56px;
+        flex-shrink: 0;
+    }
+
+    .auth-nav-logo {
+        font-family: var(--font-heading);
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: white;
+    }
+
+    .auth-nav-logo span {
+        color: var(--accent);
+        font-style: italic;
+    }
+
+    .auth-gold-rule {
+        height: 2px;
+        background: linear-gradient(90deg,
+            var(--accent), #b8872e, var(--accent));
+        flex-shrink: 0;
+    }
+
+    .auth-body {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 48px 20px;
+    }
+
+    .auth-card {
+        width: 100%;
+        max-width: 480px;
+        background: white;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 12px 48px rgba(26,26,46,0.1);
+    }
+
+    .auth-card-top {
+        background: var(--navy);
+        padding: 28px 40px;
+    }
+
+    .auth-card-icon {
+        font-size: 2rem;
+        margin-bottom: 8px;
+        display: block;
+    }
+
+    .auth-card-title {
+        font-family: var(--font-heading);
+        font-size: 1.3rem;
+        color: white;
+        margin-bottom: 4px;
+    }
+
+    .auth-card-sub {
+        font-size: 0.8rem;
+        color: rgba(255,255,255,0.45);
+    }
+
+    .auth-card-body { padding: 36px 40px; }
+
+    .auth-welcome {
+        font-size: 0.95rem;
+        color: var(--text-muted);
+        line-height: 1.7;
+        margin-bottom: 28px;
+        padding-bottom: 24px;
+        border-bottom: 1px solid #e8e4dc;
+    }
+
+    .auth-welcome strong {
+        color: var(--text-primary);
+        font-weight: 600;
+    }
+
+    .auth-field-label {
+        display: block;
+        font-size: 0.68rem;
+        font-weight: 700;
+        color: var(--text-muted);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        margin-bottom: 8px;
+    }
+
+    .auth-field-input {
+        width: 100%;
+        height: 44px;
+        background: #f7f3eb;
+        border: 1.5px solid #e0d8cc;
+        border-radius: 8px;
+        padding: 0 14px;
+        font-size: 0.9rem;
+        color: var(--text-primary);
+        font-family: var(--font-body);
+        outline: none;
+        transition: all 0.2s;
+        margin-bottom: 6px;
+    }
+
+    .auth-field-input:focus {
+        border-color: var(--navy);
+        background: white;
+        box-shadow: 0 0 0 3px rgba(44,74,110,0.07);
+    }
+
+    .auth-field-input::placeholder { color: #c4b89e; }
+
+    .auth-field-hint {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        margin-bottom: 24px;
+    }
+
+    .auth-btn {
+        width: 100%;
+        height: 46px;
+        background: var(--navy);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-family: var(--font-body);
+        font-size: 0.9rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .auth-btn:hover {
+        background: var(--navy-light);
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px rgba(44,74,110,0.25);
+    }
+
+    .auth-skip {
+        text-align: center;
+        margin-top: 14px;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+
+    .auth-skip a {
+        color: var(--text-muted);
+        text-decoration: underline;
+    }
+
+    .auth-skip a:hover { color: var(--navy); }
+
+    /* Progress indicator */
+    .auth-progress {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 24px;
+    }
+
+    .auth-progress-step {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+    }
+
+    .auth-progress-dot {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        border: 2px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.65rem;
+        font-weight: 700;
+        color: var(--text-muted);
+    }
+
+    .auth-progress-dot.done {
+        background: var(--success);
+        border-color: var(--success);
+        color: white;
+    }
+
+    .auth-progress-dot.active {
+        background: var(--navy);
+        border-color: var(--navy);
+        color: white;
+    }
+
+    .auth-progress-line {
+        flex: 1;
+        height: 1px;
+        background: var(--border);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="auth-wrapper">
+
+    <div class="auth-nav">
+        <div class="auth-nav-logo">
+            Advisor<span>Nest</span>
+        </div>
+    </div>
+
+    <div class="auth-gold-rule"></div>
+
+    <div class="auth-body">
+        <div class="auth-card">
+
+            <div class="auth-card-top">
+                <span class="auth-card-icon">👋</span>
+                <div class="auth-card-title">
+                    One last step
+                </div>
+                <div class="auth-card-sub">
+                    Complete your advisor profile
+                </div>
+            </div>
+
+            <div class="auth-card-body">
+
+                <!-- Progress -->
+                <div class="auth-progress">
+                    <div class="auth-progress-step">
+                        <div class="auth-progress-dot done">✓</div>
+                        <span>Google Sign In</span>
+                    </div>
+                    <div class="auth-progress-line"></div>
+                    <div class="auth-progress-step">
+                        <div class="auth-progress-dot active">2</div>
+                        <span>Your Profile</span>
+                    </div>
+                    <div class="auth-progress-line"></div>
+                    <div class="auth-progress-step">
+                        <div class="auth-progress-dot">3</div>
+                        <span>Dashboard</span>
+                    </div>
+                </div>
+
+                <div class="auth-welcome">
+                    Welcome, <strong>
+                        {{ advisor.full_name.split()[0]
+                           if advisor.full_name else "Advisor" }}
+                    </strong>! Your Google account has been
+                    connected successfully. Just tell us one
+                    more thing about yourself.
+                </div>
+
+                <form method="POST"
+                      action="{{ url_for('main.onboarding') }}">
+
+                    <label class="auth-field-label" for="firm_name">
+                        Firm Name
+                    </label>
+                    <input
+                        type="text"
+                        id="firm_name"
+                        name="firm_name"
+                        class="auth-field-input"
+                        placeholder="e.g. Johnson Wealth Management"
+                        autocomplete="organization"
+                        autofocus
+                    >
+                    <div class="auth-field-hint">
+                        Optional — leave blank if you are an
+                        independent advisor
+                    </div>
+
+                    <button type="submit" class="auth-btn">
+                        Go to My Dashboard →
+                    </button>
+
+                </form>
+
+                <div class="auth-skip">
+                    <a href="{{ url_for('main.onboarding') }}"
+                       onclick="document.querySelector('input[name=firm_name]').value='';
+                                return true;">
+                        Skip for now
+                    </a>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

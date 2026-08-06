@@ -50,6 +50,171 @@ def login():
 
     return render_template("auth/login.html")
 
+# ── Forgot Password ───────────────────────────────────────
+@main.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    if request.method == "POST":
+        email = request.form.get("email", "").strip()
+
+        if not email:
+            flash("Please enter your email address.", "error")
+            return redirect(url_for("main.forgot_password"))
+
+        try:
+            from auth import supabase
+            supabase.auth.reset_password_email(
+                email,
+                options={"redirect_to": "http://127.0.0.1:5000/reset-password"}
+            )
+        except Exception as e:
+            pass
+
+        # Always show success — never reveal if email exists
+        flash("If an account exists for that email, a reset link has been sent.", "success")
+        return redirect(url_for("main.login"))
+
+    return render_template("auth/forgot_password.html")
+
+# ── Google OAuth ──────────────────────────────────────────
+@main.route("/auth/google")
+def google_login():
+    from auth import get_google_auth_url
+    url = get_google_auth_url()
+    if url:
+        return redirect(url)
+    flash("Google sign in is unavailable. Please use email.", "error")
+    return redirect(url_for("main.login"))
+
+
+# ── Google OAuth Callback ─────────────────────────────────
+@main.route("/auth/google/callback")
+def google_callback():
+    try:
+        # Get the session from Supabase after Google auth
+        from auth import supabase
+
+        code = request.args.get("code")
+        if not code:
+            flash("Google sign in failed. Please try again.", "error")
+            return redirect(url_for("main.login"))
+
+        # Exchange code for session
+        response = supabase.auth.exchange_code_for_session({
+            "auth_code": code
+        })
+
+        if not response.user:
+            flash("Could not sign in with Google.", "error")
+            return redirect(url_for("main.login"))
+
+        user = response.user
+        user_id = user.id
+        email = user.email
+        full_name = user.user_metadata.get("full_name", "") or \
+                    user.user_metadata.get("name", "")
+
+        # Check if advisor profile exists
+        profile = supabase.table("advisors")\
+            .select("*")\
+            .eq("id", user_id)\
+            .execute()
+
+        if profile.data and len(profile.data) > 0:
+            # Existing advisor — go straight to dashboard
+            firm_name = profile.data[0].get("firm_name", "")
+            session["logged_in"] = True
+            session["advisor"] = {
+                "user_id":   user_id,
+                "email":     email,
+                "full_name": full_name,
+                "firm_name": firm_name
+            }
+            flash(f"Welcome back, {full_name}!", "success")
+            return redirect(url_for("main.dashboard"))
+        else:
+            # New advisor — save basic profile and go to onboarding
+            supabase.table("advisors").insert({
+                "id":        user_id,
+                "full_name": full_name,
+                "firm_name": ""
+            }).execute()
+
+            session["logged_in"]   = True
+            session["onboarding"]  = True
+            session["advisor"] = {
+                "user_id":   user_id,
+                "email":     email,
+                "full_name": full_name,
+                "firm_name": ""
+            }
+            return redirect(url_for("main.onboarding"))
+
+    except Exception as e:
+        print(f"Google callback error: {str(e)}")
+        flash("Google sign in failed. Please try again.", "error")
+        return redirect(url_for("main.login"))
+
+
+# ── Onboarding ────────────────────────────────────────────
+@main.route("/onboarding", methods=["GET", "POST"])
+def onboarding():
+    if not session.get("logged_in"):
+        return redirect(url_for("main.login"))
+
+    # If already completed onboarding go to dashboard
+    if not session.get("onboarding") and \
+       session.get("advisor", {}).get("firm_name"):
+        return redirect(url_for("main.dashboard"))
+
+    if request.method == "POST":
+        firm_name = request.form.get("firm_name", "").strip()
+        advisor_id = session["advisor"]["user_id"]
+
+        try:
+            from auth import supabase
+            supabase.table("advisors")\
+                .update({"firm_name": firm_name})\
+                .eq("id", advisor_id)\
+                .execute()
+
+            session["advisor"]["firm_name"] = firm_name
+            session.pop("onboarding", None)
+            flash(f"Welcome to AdvisorNest, "
+                  f"{session['advisor']['full_name']}!", "success")
+            return redirect(url_for("main.dashboard"))
+
+        except Exception as e:
+            flash("Could not save your details. Please try again.", "error")
+            return redirect(url_for("main.onboarding"))
+
+    return render_template("auth/onboarding.html",
+        advisor=session.get("advisor"))
+
+# ── Reset Password ────────────────────────────────────────
+@main.route("/reset-password", methods=["GET", "POST"])
+def reset_password():
+    if request.method == "POST":
+        password = request.form.get("password", "")
+        confirm  = request.form.get("confirm_password", "")
+
+        if len(password) < 8:
+            flash("Password must be at least 8 characters.", "error")
+            return redirect(url_for("main.reset_password"))
+
+        if password != confirm:
+            flash("Passwords do not match.", "error")
+            return redirect(url_for("main.reset_password"))
+
+        try:
+            from auth import supabase
+            supabase.auth.update_user({"password": password})
+            flash("Password updated successfully. Please log in.", "success")
+            return redirect(url_for("main.login"))
+        except Exception as e:
+            flash("Could not reset password. Please try again.", "error")
+            return redirect(url_for("main.reset_password"))
+
+    return render_template("auth/reset_password.html")
 
 # ── Register ──────────────────────────────────────────────
 @main.route("/register", methods=["GET", "POST"])
