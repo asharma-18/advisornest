@@ -2,167 +2,334 @@
 
 {% block title %}Dashboard — AdvisorNest{% endblock %}
 
-{% block content %}
+{% block page_title %}
+    Good day, {{ advisor.get('full_name', '').split()[0] }}
+{% endblock %}
 
-<!-- ── Page Header ─────────────────────────────────────── -->
-<div class="section-header">
-    <div>
-        <h1 class="section-title">
-            Good day, {{ advisor.full_name.split()[0] }}
-        </h1>
-        <p class="section-subtitle">
-            {{ advisor.firm_name if advisor.firm_name else "Independent Advisor" }}
-            · Welcome to AdvisorNest
-        </p>
-    </div>
+{% block page_subtitle %}
+    {{ advisor.get('firm_name') or 'Independent Advisor' }}
+    · Welcome to AdvisorNest
+{% endblock %}
+
+{% block page_action %}
     <a href="{{ url_for('main.portal') }}" class="btn btn-primary">
         + New Recommendation
     </a>
-</div>
+{% endblock %}
 
-<!-- ── Stats Row ──────────────────────────────────────── -->
-<div class="stats-grid">
-    <div class="stat-card">
-        <div class="stat-label">Saved Clients</div>
-        <div class="stat-value">{{ client_count }}</div>
-        <div class="stat-sub">
-    {{ "No clients saved yet" if client_count == 0 else "clients in your account" }}
-</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">Recommendations</div>
-        <div class="stat-value">0</div>
-        <div class="stat-sub">Generate your first one</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">Advisor</div>
-        <div class="stat-value" style="font-size:1.1rem">
-            {{ advisor.full_name }}
+{% block extra_css %}
+<style>
+    .stats-row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-bottom: 28px;
+    }
+
+    .stat-box {
+        background: white;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 20px 24px;
+        border-top: 2px solid var(--navy);
+        transition: box-shadow 0.2s;
+    }
+
+    .stat-box:hover {
+        box-shadow: 0 4px 16px rgba(26,26,46,0.08);
+    }
+
+    .stat-box.gold-top { border-top-color: var(--accent); }
+    .stat-box.green-top { border-top-color: #2d7d4f; }
+
+    .stat-box-label {
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: var(--text-muted);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        margin-bottom: 8px;
+    }
+
+    .stat-box-value {
+        font-family: var(--font-heading);
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        line-height: 1;
+        margin-bottom: 4px;
+    }
+
+    .stat-box-value.gold { color: var(--accent); }
+    .stat-box-value.green { color: #2d7d4f; }
+
+    .stat-box-sub {
+        font-size: 0.775rem;
+        color: var(--text-muted);
+    }
+
+    .section-label {
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: var(--text-muted);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        margin-bottom: 14px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .section-label::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: var(--border);
+    }
+
+    .action-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-bottom: 28px;
+    }
+
+    .action-card {
+        background: white;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        transition: all 0.2s;
+    }
+
+    .action-card:hover {
+        border-color: var(--navy);
+        box-shadow: 0 4px 16px rgba(44,74,110,0.08);
+        transform: translateY(-1px);
+    }
+
+    .action-card-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+        margin-bottom: 12px;
+    }
+
+    .action-card-title {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 6px;
+    }
+
+    .action-card-desc {
+        font-size: 0.775rem;
+        color: var(--text-muted);
+        line-height: 1.5;
+        flex: 1;
+        margin-bottom: 14px;
+    }
+
+    .action-card-link {
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: var(--navy);
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        transition: gap 0.2s;
+        text-decoration: none;
+    }
+
+    .action-card:hover .action-card-link {
+        color: var(--accent);
+        gap: 8px;
+    }
+
+    .getting-started {
+        background: white;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 24px;
+    }
+
+    .gs-title {
+        font-family: var(--font-heading);
+        font-size: 1.1rem;
+        color: var(--text-primary);
+        margin-bottom: 4px;
+    }
+
+    .gs-sub {
+        font-size: 0.825rem;
+        color: var(--text-muted);
+        margin-bottom: 20px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--border-light);
+    }
+
+    .gs-step {
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+        margin-bottom: 16px;
+    }
+
+    .gs-step:last-child { margin-bottom: 0; }
+
+    .gs-step-num {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: white;
+        flex-shrink: 0;
+        margin-top: 1px;
+    }
+
+    .gs-step-title {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 3px;
+    }
+
+    .gs-step-desc {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        line-height: 1.6;
+    }
+</style>
+{% endblock %}
+
+{% block page_content %}
+
+<!-- Stats -->
+<div class="stats-row">
+    <div class="stat-box">
+        <div class="stat-box-label">Saved Clients</div>
+        <div class="stat-box-value">{{ client_count }}</div>
+        <div class="stat-box-sub">
+            {{ "No clients yet" if client_count == 0
+               else "Active profiles" }}
         </div>
-        <div class="stat-sub">{{ advisor.email }}</div>
+    </div>
+    <div class="stat-box gold-top">
+        <div class="stat-box-label">Plan</div>
+        <div class="stat-box-value gold">Free</div>
+        <div class="stat-box-sub">Full beta access</div>
+    </div>
+    <div class="stat-box green-top">
+        <div class="stat-box-label">Status</div>
+        <div class="stat-box-value green"
+             style="font-size:1.4rem">Active</div>
+        <div class="stat-box-sub">Account verified</div>
     </div>
 </div>
 
-<!-- ── Quick Actions ──────────────────────────────────── -->
-<div class="divider">
-    <div class="divider-line"></div>
-    <div class="divider-label">Quick Actions</div>
-    <div class="divider-line"></div>
-</div>
+<!-- Quick Actions -->
+<div class="section-label">Quick Actions</div>
 
-<div class="grid-3" style="margin-bottom: var(--space-2xl)">
+<div class="action-grid">
 
-    <div class="card text-center">
-        <div style="font-size:2rem;margin-bottom:var(--space-md)">📊</div>
-        <h3 class="card-title">New Recommendation</h3>
-        <p style="font-size:0.875rem;margin:var(--space-md) 0">
-            Generate an AI-powered portfolio allocation for a client
-        </p>
-        <a href="{{ url_for('main.portal') }}" class="btn btn-primary btn-full">
-            Get Started
-        </a>
-    </div>
-
-    <div class="card text-center">
-        <div style="font-size:2rem;margin-bottom:var(--space-md)">👥</div>
-        <h3 class="card-title">My Clients</h3>
-        <p style="font-size:0.875rem;margin:var(--space-md) 0">
-            View and manage all your saved client profiles
-        </p>
-        <a href="{{ url_for('main.clients') }}" class="btn btn-outline btn-full">
-            View Clients
-        </a>
-    </div>
-
-    <div class="card text-center">
-        <div style="font-size:2rem;margin-bottom:var(--space-md)">📋</div>
-        <h3 class="card-title">PDF Reports</h3>
-        <p style="font-size:0.875rem;margin:var(--space-md) 0">
-            Download branded reports to share with your clients
-        </p>
-        <a href="{{ url_for('main.clients') }}" class="btn btn-outline btn-full">
-            View Reports
-        </a>
-    </div>
-
-</div>
-
-<!-- ── Getting Started ────────────────────────────────── -->
-<div class="divider">
-    <div class="divider-line"></div>
-    <div class="divider-label">Getting Started</div>
-    <div class="divider-line"></div>
-</div>
-
-<div class="card">
-    <div class="card-header">
-        <div class="card-title">Welcome to AdvisorNest</div>
-        <div class="card-subtitle">
-            Here is how to get the most out of your account
+    <div class="action-card">
+        <div class="action-card-icon"
+             style="background:#eef2f7">📊</div>
+        <div class="action-card-title">New Recommendation</div>
+        <div class="action-card-desc">
+            Generate an AI-powered portfolio allocation
+            for a client using live market data
         </div>
+        <a href="{{ url_for('main.portal') }}"
+           class="action-card-link">Get Started →</a>
     </div>
 
-    <div style="display:flex;flex-direction:column;gap:var(--space-lg)">
+    <div class="action-card">
+        <div class="action-card-icon"
+             style="background:#edf7f1">👥</div>
+        <div class="action-card-title">My Clients</div>
+        <div class="action-card-desc">
+            View and manage all your saved client
+            profiles and recommendations
+        </div>
+        <a href="{{ url_for('main.clients') }}"
+           class="action-card-link">View Clients →</a>
+    </div>
 
-        <div style="display:flex;align-items:flex-start;gap:var(--space-lg)">
-            <div style="
-                width:32px;height:32px;border-radius:50%;
-                background:var(--navy);color:white;
-                display:flex;align-items:center;justify-content:center;
-                font-size:0.875rem;font-weight:600;flex-shrink:0
-            ">1</div>
-            <div>
-                <div style="font-weight:600;color:var(--text-primary);margin-bottom:4px">
-                    Generate your first recommendation
-                </div>
-                <div style="font-size:0.875rem;color:var(--text-muted)">
-                    Click "New Recommendation" and enter a client's profile — 
-                    risk tolerance, investment amount, time horizon, and age. 
-                    AdvisorNest will generate a complete portfolio allocation 
-                    with live market data in seconds.
-                </div>
+    <div class="action-card">
+        <div class="action-card-icon"
+             style="background:#faf0ff">📝</div>
+        <div class="action-card-title">Meeting Notes</div>
+        <div class="action-card-desc">
+            Document client meetings, record discussions
+            and track portfolio decisions over time
+        </div>
+        <a href="{{ url_for('main.notes') }}"
+           class="action-card-link">View Notes →</a>
+    </div>
+
+</div>
+
+<!-- Getting Started -->
+<div class="section-label">Getting Started</div>
+
+<div class="getting-started">
+    <div class="gs-title">Welcome to AdvisorNest</div>
+    <div class="gs-sub">
+        Here is how to get the most out of your account
+    </div>
+
+    <div class="gs-step">
+        <div class="gs-step-num"
+             style="background:var(--navy)">1</div>
+        <div>
+            <div class="gs-step-title">
+                Generate your first recommendation
+            </div>
+            <div class="gs-step-desc">
+                Click New Recommendation and enter a client profile.
+                AdvisorNest generates a complete portfolio allocation
+                with live market data in seconds.
             </div>
         </div>
-
-        <div style="display:flex;align-items:flex-start;gap:var(--space-lg)">
-            <div style="
-                width:32px;height:32px;border-radius:50%;
-                background:var(--accent);color:white;
-                display:flex;align-items:center;justify-content:center;
-                font-size:0.875rem;font-weight:600;flex-shrink:0
-            ">2</div>
-            <div>
-                <div style="font-weight:600;color:var(--text-primary);margin-bottom:4px">
-                    Save the client profile
-                </div>
-                <div style="font-size:0.875rem;color:var(--text-muted)">
-                    After reviewing the recommendation, save the client profile 
-                    to your account. You can come back anytime to view or 
-                    update their allocation.
-                </div>
-            </div>
-        </div>
-
-        <div style="display:flex;align-items:flex-start;gap:var(--space-lg)">
-            <div style="
-                width:32px;height:32px;border-radius:50%;
-                background:var(--success);color:white;
-                display:flex;align-items:center;justify-content:center;
-                font-size:0.875rem;font-weight:600;flex-shrink:0
-            ">3</div>
-            <div>
-                <div style="font-weight:600;color:var(--text-primary);margin-bottom:4px">
-                    Download the PDF report
-                </div>
-                <div style="font-size:0.875rem;color:var(--text-muted)">
-                    Generate a branded AdvisorNest PDF report you can 
-                    hand directly to your client. Professional, clear, 
-                    and ready to present.
-                </div>
-            </div>
-        </div>
-
     </div>
+
+    <div class="gs-step">
+        <div class="gs-step-num"
+             style="background:var(--accent)">2</div>
+        <div>
+            <div class="gs-step-title">Save the client profile</div>
+            <div class="gs-step-desc">
+                After reviewing the recommendation, save the client
+                profile to your account. Return anytime to view or
+                download their report.
+            </div>
+        </div>
+    </div>
+
+    <div class="gs-step">
+        <div class="gs-step-num"
+             style="background:#2d7d4f">3</div>
+        <div>
+            <div class="gs-step-title">Download the PDF report</div>
+            <div class="gs-step-desc">
+                Generate a branded AdvisorNest PDF report you can
+                hand directly to your client. Professional, clear,
+                and ready to present.
+            </div>
+        </div>
+    </div>
+
 </div>
 
 {% endblock %}

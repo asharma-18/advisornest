@@ -1,3 +1,5 @@
+from notes_db import get_all_notes, get_client_notes, add_note, delete_note, get_note_count, update_note
+from notes_db import get_all_notes, get_client_notes, add_note, delete_note, get_note_count
 from pdf_generator import generate_pdf_report
 from flask import send_file
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
@@ -189,6 +191,63 @@ def onboarding():
 
     return render_template("auth/onboarding.html",
         advisor=session.get("advisor"))
+
+# ── Profile Settings ──────────────────────────────────────
+@main.route("/settings", methods=["GET", "POST"])
+def settings():
+    if not session.get("logged_in"):
+        flash("Please log in to continue.", "info")
+        return redirect(url_for("main.login"))
+
+    advisor_id = session["advisor"]["user_id"]
+
+    if request.method == "POST":
+        full_name = request.form.get("full_name", "").strip()
+        firm_name = request.form.get("firm_name", "").strip()
+
+        if not full_name:
+            flash("Full name cannot be empty.", "error")
+            return redirect(url_for("main.settings"))
+
+        try:
+            from auth import supabase
+            supabase.table("advisors")\
+                .update({
+                    "full_name": full_name,
+                    "firm_name": firm_name
+                })\
+                .eq("id", advisor_id)\
+                .execute()
+
+            # Update session too
+            session["advisor"]["full_name"] = full_name
+            session["advisor"]["firm_name"] = firm_name
+            session.modified = True
+
+            flash("Profile updated successfully.", "success")
+            return redirect(url_for("main.settings"))
+
+        except Exception as e:
+            flash("Could not update profile. Please try again.", "error")
+            return redirect(url_for("main.settings"))
+
+    # Fetch latest profile from database
+    try:
+        from auth import supabase
+        profile = supabase.table("advisors")\
+            .select("*")\
+            .eq("id", advisor_id)\
+            .execute()
+
+        advisor = profile.data[0] if profile.data else session["advisor"]
+    except Exception:
+        advisor = session["advisor"]
+
+    client_count = get_client_count(advisor_id)
+    return render_template("portal/settings.html",
+        advisor=advisor,
+        email=session["advisor"]["email"],
+        client_count=client_count)
 
 # ── Reset Password ────────────────────────────────────────
 @main.route("/reset-password", methods=["GET", "POST"])
@@ -446,6 +505,112 @@ def view_client(client_id):
     return render_template("clients/view.html",
         advisor=session.get("advisor"),
         client=client)
+
+# ── Portfolio Notes ───────────────────────────────────────
+@main.route("/notes")
+def notes():
+    if not session.get("logged_in"):
+        flash("Please log in to continue.", "info")
+        return redirect(url_for("main.login"))
+
+    advisor_id      = session["advisor"]["user_id"]
+    all_clients     = get_all_clients(advisor_id)
+    selected_client = request.args.get("client", "").strip()
+    search_query    = request.args.get("q", "").strip()
+
+    # Get notes — filtered by client if selected
+    if selected_client:
+        all_notes = get_client_notes(advisor_id, selected_client)
+    else:
+        all_notes = get_all_notes(advisor_id)
+
+    # Get ALL notes for sidebar counts (unfiltered)
+    all_notes_unfiltered = get_all_notes(advisor_id)
+
+    # Filter by search query
+    if search_query:
+        all_notes = [n for n in all_notes if
+            search_query.lower() in n.get("subject", "").lower() or
+            search_query.lower() in n.get("body", "").lower() or
+            search_query.lower() in (
+                (n.get("clients") or {}).get("client_name", "")
+            ).lower()
+        ]
+
+    return render_template("notes/list.html",
+        advisor=session.get("advisor"),
+        notes=all_notes,
+        all_notes=all_notes_unfiltered,
+        clients=all_clients,
+        selected_client=selected_client,
+        search_query=search_query)
+# ── Add Note ──────────────────────────────────────────────
+@main.route("/notes/add", methods=["POST"])
+def add_note_route():
+    if not session.get("logged_in"):
+        return redirect(url_for("main.login"))
+
+    advisor_id   = session["advisor"]["user_id"]
+    client_id    = request.form.get("client_id")
+    subject      = request.form.get("subject", "").strip()
+    body         = request.form.get("body", "").strip()
+    meeting_date = request.form.get("meeting_date", "")
+
+    if not client_id or not subject or not body:
+        flash("Please fill in all required fields.", "error")
+        return redirect(url_for("main.notes"))
+
+    result = add_note(advisor_id, client_id,
+                      subject, body, meeting_date)
+
+    if result["success"]:
+        flash("Note saved successfully.", "success")
+    else:
+        flash("Could not save note. Please try again.", "error")
+
+    return redirect(url_for("main.notes"))
+
+
+# ── Delete Note ───────────────────────────────────────────
+@main.route("/notes/delete/<note_id>", methods=["POST"])
+def delete_note_route(note_id):
+    if not session.get("logged_in"):
+        return redirect(url_for("main.login"))
+
+    advisor_id = session["advisor"]["user_id"]
+    result     = delete_note(note_id, advisor_id)
+
+    if result["success"]:
+        flash("Note deleted.", "success")
+    else:
+        flash("Could not delete note.", "error")
+
+    return redirect(url_for("main.notes"))
+
+# ── Update Note ───────────────────────────────────────────
+@main.route("/notes/update/<note_id>", methods=["POST"])
+def update_note_route(note_id):
+    if not session.get("logged_in"):
+        return redirect(url_for("main.login"))
+
+    advisor_id   = session["advisor"]["user_id"]
+    subject      = request.form.get("subject", "").strip()
+    body         = request.form.get("body", "").strip()
+    meeting_date = request.form.get("meeting_date", "")
+
+    if not subject or not body:
+        flash("Subject and notes cannot be empty.", "error")
+        return redirect(url_for("main.notes"))
+
+    result = update_note(note_id, advisor_id,
+                         subject, body, meeting_date)
+
+    if result["success"]:
+        flash("Note updated successfully.", "success")
+    else:
+        flash("Could not update note.", "error")
+
+    return redirect(url_for("main.notes"))
 
 # ── Download PDF ──────────────────────────────────────────
 @main.route("/download-pdf/<client_id>")

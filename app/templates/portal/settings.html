@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+
+{% block title %}Profile Settings — AdvisorNest{% endblock %}
+
+{% block page_content %}
+
+<!-- ── Page Header ─────────────────────────────────────── -->
+<div class="section-header">
+    <div>
+        <h1 class="section-title">Profile Settings</h1>
+        <p class="section-subtitle">
+            Manage your advisor account details
+        </p>
+    </div>
+</div>
+
+<!-- ── Two Column Layout ──────────────────────────────── -->
+<div style="display:grid;grid-template-columns:1fr 1fr;
+            gap:var(--space-xl);align-items:start">
+
+    <!-- ── Left Column ────────────────────────────────── -->
+    <div style="display:flex;flex-direction:column;gap:var(--space-xl)">
+
+        <!-- Profile Card -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">Advisor Profile</div>
+                <div class="card-subtitle">
+                    Update your name and firm details
+                </div>
+            </div>
+
+            <form method="POST" action="{{ url_for('main.settings') }}">
+
+                <div class="form-group">
+                    <label class="form-label" for="full_name">
+                        Full Name *
+                    </label>
+                    <input
+                        type="text"
+                        id="full_name"
+                        name="full_name"
+                        class="form-input"
+                        value="{{ advisor.get('full_name', '') }}"
+                        placeholder="Your full name"
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="firm_name">
+                        Firm Name
+                    </label>
+                    <input
+                        type="text"
+                        id="firm_name"
+                        name="firm_name"
+                        class="form-input"
+                        value="{{ advisor.get('firm_name', '') }}"
+                        placeholder="Your firm name (optional)"
+                    >
+                    <div class="form-hint">
+                        Leave blank if you are an independent advisor
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Email Address</label>
+                    <input
+                        type="email"
+                        class="form-input"
+                        value="{{ email }}"
+                        disabled
+                        style="opacity:0.6;cursor:not-allowed;
+                               background:var(--bg-tertiary)"
+                    >
+                    <div class="form-hint">
+                        Email cannot be changed here — contact
+                        support if you need to update it
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary">
+                    Save Changes
+                </button>
+
+            </form>
+        </div>
+
+        <!-- Password & Security -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">Password & Security</div>
+                <div class="card-subtitle">
+                    Manage your login security
+                </div>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:0">
+
+                <div style="display:flex;justify-content:space-between;
+                            align-items:center;padding:var(--space-md) 0;
+                            border-bottom:1px solid var(--border-light)">
+                    <div>
+                        <div style="font-size:0.875rem;font-weight:600;
+                                    color:var(--text-primary)">
+                            Password
+                        </div>
+                        <div style="font-size:0.8rem;
+                                    color:var(--text-muted)">
+                            Reset via email link
+                        </div>
+                    </div>
+                    <a href="{{ url_for('main.forgot_password') }}"
+                       class="btn btn-outline btn-sm">
+                        Change Password
+                    </a>
+                </div>
+
+                <div style="display:flex;justify-content:space-between;
+                            align-items:center;padding:var(--space-md) 0">
+                    <div>
+                        <div style="font-size:0.875rem;font-weight:600;
+                                    color:var(--text-primary)">
+                            Two Factor Authentication
+                        </div>
+                        <div style="font-size:0.8rem;
+                                    color:var(--text-muted)">
+                            Coming soon — extra security for your account
+                        </div>
+                    </div>
+                    <span class="badge badge-gold">Soon</span>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ── Right Column ───────────────────────────────── -->
+    <div style="display:flex;flex-direction:column;gap:var(--space-xl)">
+
+        <!-- Account Information -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">Account Information</div>
+                <div class="card-subtitle">
+                    Your account details and status
+                </div>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:0">
+
+                <div style="display:flex;justify-content:space-between;
+                            align-items:center;padding:var(--space-md) 0;
+                            border-bottom:1px solid var(--border-light)">
+                    <div>
+                        <div style="font-size:0.875rem;font-weight:600;
+                                    color:var(--text-primary)">
+                            Account Type
+                        </div>
+                        <div style="font-size:0.8rem;
+                                    color:var(--text-muted)">
+                            Licensed Financial Advisor
+                        </div>
+                    </div>
+                    <span class="badge badge-navy">Active</span>
+                </div>
+
+                <div style="display:flex;justify-content:space-between;
+                            align-items:center;padding:var(--space-md) 0;
+                            border-bottom:1px solid var(--border-light)">
+                    <div>
+                        <div style="font-size:0.875rem;font-weight:600;
+                                    color:var(--text-primary)">
+                            Plan
+                        </div>
+                        <div style="font-size:0.8rem;
+                                    color:var(--text-muted)">
+                            AdvisorNest Free Beta
+                        </div>
+                    </div>
+                    <span class="badge badge-gold">Beta</span>
+                </div>
+
+                <div style="display:flex;justify-content:space-between;
+                            align-items:center;padding:var(--space-md) 0;
+                            border-bottom:1px solid var(--border-light)">
+                    <div>
+                        <div style="font-size:0.875rem;font-weight:600;
+                                    color:var(--text-primary)">
+                            Login Method
+                        </div>
+                        <div style="font-size:0.8rem;
+                                    color:var(--text-muted)">
+                            {% if 'gmail' in email|lower %}
+                                Google Sign In
+                            {% else %}
+                                Email and Password
+                            {% endif %}
+                        </div>
+                    </div>
+                    <span class="badge badge-success">Verified</span>
+                </div>
+
+                <div style="display:flex;justify-content:space-between;
+                            align-items:center;padding:var(--space-md) 0">
+                    <div>
+                        <div style="font-size:0.875rem;font-weight:600;
+                                    color:var(--text-primary)">
+                            Member Since
+                        </div>
+                        <div style="font-size:0.8rem;
+                                    color:var(--text-muted)">
+                            {{ advisor.get('created_at', '')[:10]
+                               if advisor.get('created_at') else 'N/A' }}
+                        </div>
+                    </div>
+                    <span class="badge badge-navy">AdvisorNest</span>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Your Activity -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">Your Activity</div>
+                <div class="card-subtitle">
+                    Overview of your AdvisorNest usage
+                </div>
+            </div>
+
+            <div class="stats-grid"
+                 style="grid-template-columns:1fr 1fr;margin-bottom:0">
+                <div class="stat-card">
+                    <div class="stat-label">Saved Clients</div>
+                    <div class="stat-value">{{ client_count }}</div>
+                    <div class="stat-sub">In your account</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Plan</div>
+                    <div class="stat-value"
+                         style="font-size:1.2rem;color:var(--accent)">
+                        Free
+                    </div>
+                    <div class="stat-sub">Beta access</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pro Tip -->
+        <div class="card"
+             style="background:var(--navy);border-color:var(--navy)">
+            <div style="font-size:0.75rem;font-weight:700;
+                        color:rgba(255,255,255,0.45);
+                        letter-spacing:0.1em;text-transform:uppercase;
+                        margin-bottom:var(--space-sm)">
+                Pro Tip
+            </div>
+            <div style="font-size:0.875rem;color:white;
+                        font-weight:600;margin-bottom:var(--space-sm)">
+                Keep your firm name updated
+            </div>
+            <div style="font-size:0.8rem;color:rgba(255,255,255,0.5);
+                        line-height:1.6">
+                Your firm name appears on every PDF report you generate
+                for clients. Make sure it reflects your current
+                practice name.
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

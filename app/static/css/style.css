@@ -6,9 +6,9 @@
 /* ── CSS Variables — change these to retheme the entire app ── */
 :root {
     /* Colors */
-    --bg-primary:    #faf9f7;
+    --bg-primary:    #f7f3eb;
     --bg-secondary:  #ffffff;
-    --bg-tertiary:   #f3f0eb;
+    --bg-tertiary:   #f0ebe0;
     --text-primary:  #1a1a2e;
     --text-secondary:#4a5568;
     --text-muted:    #8892a4;
@@ -16,8 +16,8 @@
     --accent-dark:   #b8872e;
     --navy:          #2c4a6e;
     --navy-light:    #3d6491;
-    --border:        #e8e4dc;
-    --border-light:  #f0ece4;
+    --border:        #e0d8cc;
+    --border-light:  #e8e4dc;
     --success:       #2d7d4f;
     --success-bg:    #edf7f1;
     --error:         #c53030;
@@ -103,7 +103,12 @@ a {
     text-decoration: none;
     transition: var(--transition);
 }
-
+.no-links a {
+    color: inherit !important;
+    text-decoration: none !important;
+    pointer-events: none !important;
+    cursor: default !important;
+}
 a:hover { color: var(--accent); }
 
 /* ── Navigation ──────────────────────────────────────── */
@@ -766,3 +771,265 @@ tr:hover td {
 
 .w-full { width: 100%; }
 .hidden { display: none; }
+
+/* ── App Layout (Sidebar) ────────────────────────────── */
+.app-layout {
+    display: flex;
+    min-height: 100vh;
+    background: var(--bg-primary);
+}
+
+/* ── Sidebar ─────────────────────────────────────────── */
+.sidebar {
+    width: 210px;
+    background: #1a1a2e;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 100;
+    overflow-y: auto;
+}
+
+.sidebar-logo {
+    padding: 24px 20px 14px;
+}
+
+.sidebar-logo-text {
+    font-family: var(--font-heading);
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: white;
+    display: block;
+}
+
+.sidebar-logo-text span {
+    color: var(--accent);
+    font-style: italic;
+}
+
+.sidebar-logo-sub {
+    font-size: 0.6rem;
+    color: rgba(255,255,255,0.25);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-top: 3px;
+    display: block;
+}
+
+.sidebar-gold-bar {
+    height: 1px;
+    background: var(--accent);
+    margin: 0 20px 16px;
+    opacity: 0.3;
+}
+
+.sidebar-nav {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 0 10px;
+}
+
+.sidebar-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.2s;
+    border-right: 2px solid transparent;
+}
+
+.sidebar-nav-item:hover {
+    background: rgba(255,255,255,0.06);
+    color: white;
+}
+
+.sidebar-nav-item.active {
+    background: rgba(212,168,83,0.1);
+    border-right-color: var(--accent);
+    border-radius: 8px 0 0 8px;
+}
+
+.sidebar-nav-icon {
+    font-size: 1rem;
+    width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+    opacity: 0.45;
+}
+
+.sidebar-nav-item.active .sidebar-nav-icon,
+.sidebar-nav-item:hover .sidebar-nav-icon {
+    opacity: 1;
+}
+
+.sidebar-nav-label {
+    font-size: 0.8rem;
+    color: rgba(255,255,255,0.4);
+    font-weight: 500;
+    font-family: var(--font-body);
+    white-space: nowrap;
+}
+
+.sidebar-nav-item.active .sidebar-nav-label {
+    color: white;
+    font-weight: 600;
+}
+
+.sidebar-nav-item:hover .sidebar-nav-label {
+    color: rgba(255,255,255,0.75);
+}
+
+.sidebar-bottom {
+    padding: 12px 10px 16px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    margin-top: 8px;
+}
+
+.sidebar-advisor {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    margin-bottom: 4px;
+}
+
+.sidebar-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: white;
+    flex-shrink: 0;
+    font-family: var(--font-body);
+}
+
+.sidebar-advisor-info {
+    overflow: hidden;
+}
+
+.sidebar-advisor-name {
+    font-size: 0.775rem;
+    font-weight: 600;
+    color: white;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sidebar-advisor-firm {
+    font-size: 0.65rem;
+    color: rgba(255,255,255,0.3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sidebar-logout {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+.sidebar-logout:hover {
+    background: rgba(197,48,48,0.1);
+}
+
+.sidebar-logout-icon {
+    font-size: 0.9rem;
+    opacity: 0.4;
+    width: 20px;
+    text-align: center;
+}
+
+.sidebar-logout-label {
+    font-size: 0.775rem;
+    color: rgba(255,255,255,0.3);
+    font-family: var(--font-body);
+}
+
+.sidebar-logout:hover .sidebar-logout-label {
+    color: #fc8181;
+}
+
+/* ── App Main Area ───────────────────────────────────── */
+.app-main {
+    margin-left: 210px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* ── Top Bar ─────────────────────────────────────────── */
+.app-topbar {
+    background: white;
+    border-bottom: 1px solid var(--border);
+    padding: 16px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    position: relative;
+}
+
+.app-topbar-gold {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg,
+        var(--accent), #b8872e, transparent);
+}
+
+.app-topbar-title {
+    font-family: var(--font-heading);
+    font-size: 1.3rem;
+    color: var(--text-primary);
+    line-height: 1.2;
+}
+
+.app-topbar-sub {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.app-topbar-right {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+}
+
+/* ── App Content ─────────────────────────────────────── */
+.app-content {
+    padding: 32px;
+    flex: 1;
+}
+
+/* ── Flash in sidebar layout ─────────────────────────── */
+.app-main .flash-container {
+    padding: 12px 32px 0;
+}
