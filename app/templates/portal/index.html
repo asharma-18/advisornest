@@ -1,50 +1,56 @@
 {% extends "base.html" %}
 
 {% block title %}New Recommendation — AdvisorNest{% endblock %}
+{% block page_title %}New Recommendation{% endblock %}
+{% block page_subtitle %}AI-powered portfolio allocation for your client{% endblock %}
 
 {% block extra_css %}
 <style>
-    /* Portal-specific styles */
     .portal-layout {
         display: grid;
-        grid-template-columns: 380px 1fr;
-        gap: var(--space-xl);
+        grid-template-columns: 340px 1fr;
+        gap: 24px;
         align-items: start;
     }
 
     .portal-sidebar {
         position: sticky;
         top: 88px;
+        max-height: calc(100vh - 108px);
+        overflow-y: auto;
+        scrollbar-width: thin;
+        scrollbar-color: var(--border) transparent;
+    }
+
+    .portal-sidebar::-webkit-scrollbar { width: 4px; }
+    .portal-sidebar::-webkit-scrollbar-track { background: transparent; }
+    .portal-sidebar::-webkit-scrollbar-thumb {
+        background: var(--border); border-radius: 4px;
     }
 
     .risk-options {
         display: grid;
         grid-template-columns: 1fr 1fr 1fr;
-        gap: var(--space-sm);
-    }
-
-    .risk-option {
-        position: relative;
+        gap: 8px;
     }
 
     .risk-option input[type="radio"] {
-        position: absolute;
-        opacity: 0;
-        width: 0;
-        height: 0;
+        position: absolute; opacity: 0; width: 0; height: 0;
     }
+
+    .risk-option { position: relative; }
 
     .risk-label {
         display: block;
-        padding: 10px var(--space-sm);
+        padding: 10px 8px;
         border: 1.5px solid var(--border);
-        border-radius: var(--radius-md);
+        border-radius: 8px;
         text-align: center;
         cursor: pointer;
         font-size: 0.875rem;
         font-weight: 500;
         color: var(--text-secondary);
-        transition: var(--transition);
+        transition: all 0.2s;
     }
 
     .risk-option input[type="radio"]:checked + .risk-label {
@@ -54,250 +60,566 @@
         font-weight: 600;
     }
 
-    .risk-label:hover {
+    .risk-label:hover { border-color: var(--navy); color: var(--navy); }
+
+    .loading-bar-wrap {
+        margin-top: 12px;
+        height: 3px;
+        background: var(--border);
+        border-radius: 3px;
+        overflow: hidden;
+    }
+
+    .loading-bar-fill {
+        height: 100%;
+        width: 0%;
+        background: var(--navy);
+        border-radius: 3px;
+        transition: width 0.5s ease;
+    }
+
+    .ai-options-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .ai-option-card {
+        background: white;
+        border: 2px solid var(--border);
+        border-radius: 12px;
+        padding: 20px;
+        cursor: pointer;
+        transition: all 0.2s;
+        position: relative;
+        overflow: hidden;
+        user-select: none;
+    }
+
+    .ai-option-card:hover {
         border-color: var(--navy);
-        color: var(--navy);
+        box-shadow: 0 4px 16px rgba(44,74,110,0.1);
+        transform: translateY(-1px);
     }
 
-    .allocation-bar {
-        height: 8px;
-        border-radius: 4px;
-        margin-top: 6px;
-        transition: width 0.8s ease;
-    }
-
-    .instrument-card {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: var(--space-md) var(--space-lg);
-        background: var(--bg-primary);
-        border: 1px solid var(--border);
-        border-radius: var(--radius-md);
-        margin-bottom: var(--space-sm);
-        transition: var(--transition);
-    }
-
-    .instrument-card:hover {
+    .ai-option-card.selected {
         border-color: var(--navy);
-        background: var(--bg-secondary);
-        box-shadow: var(--shadow-sm);
+        background: #fafcff;
+        box-shadow: 0 4px 20px rgba(44,74,110,0.12);
     }
 
-    .instrument-ticker {
-        font-size: 0.875rem;
-        font-weight: 700;
-        color: var(--text-primary);
-        min-width: 60px;
-    }
-
-    .instrument-name {
-        font-size: 0.8rem;
-        color: var(--text-muted);
-        flex: 1;
-        padding: 0 var(--space-md);
-    }
-
-    .instrument-price {
-        font-size: 0.875rem;
-        font-weight: 600;
-        color: var(--text-primary);
-        min-width: 70px;
-        text-align: right;
-    }
-
-    .instrument-detail {
-        font-size: 0.75rem;
-        color: var(--text-muted);
-        min-width: 80px;
-        text-align: right;
-    }
-
-    .live-badge {
+    .ai-option-card.recommended::before {
+        content: 'AI Recommended';
+        position: absolute;
+        top: 12px; right: 12px;
         font-size: 0.65rem;
         font-weight: 700;
-        background: var(--success-bg);
-        color: var(--success);
-        border: 1px solid #c6f6d5;
-        border-radius: 4px;
-        padding: 1px 5px;
-        letter-spacing: 0.05em;
-        margin-left: var(--space-sm);
+        color: var(--accent);
+        background: #fef3c7;
+        border: 1px solid #fbd38d;
+        padding: 2px 8px;
+        border-radius: 10px;
+        pointer-events: none;
     }
 
-    .score-display {
-        display: flex;
-        align-items: center;
-        gap: var(--space-lg);
-        padding: var(--space-lg);
-        background: var(--bg-primary);
-        border-radius: var(--radius-lg);
-        border: 1px solid var(--border);
+    .ai-option-id {
+        width: 28px; height: 28px;
+        border-radius: 50%;
+        background: var(--navy);
+        color: white;
+        font-size: 0.8rem; font-weight: 700;
+        display: flex; align-items: center; justify-content: center;
+        margin-bottom: 10px;
+        pointer-events: none;
     }
 
-    .score-number {
+    .ai-option-card.selected .ai-option-id { background: var(--accent); }
+
+    .ai-option-name {
         font-family: var(--font-heading);
-        font-size: 3rem;
-        font-weight: 700;
-        line-height: 1;
+        font-size: 1rem; font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 4px;
+        pointer-events: none;
     }
 
-    .tabs {
-        display: flex;
-        gap: var(--space-xs);
-        border-bottom: 1px solid var(--border);
-        margin-bottom: var(--space-lg);
-    }
-
-    .tab {
-        padding: var(--space-sm) var(--space-md);
-        font-size: 0.875rem;
-        font-weight: 500;
+    .ai-option-tagline {
+        font-size: 0.775rem;
         color: var(--text-muted);
-        cursor: pointer;
+        margin-bottom: 14px;
+        line-height: 1.4;
+        pointer-events: none;
+    }
+
+    .ai-option-bars {
+        display: flex; flex-direction: column;
+        gap: 5px; pointer-events: none;
+    }
+
+    .ai-option-bar-row { display: flex; align-items: center; gap: 8px; }
+
+    .ai-option-bar-label {
+        font-size: 0.65rem; color: var(--text-muted);
+        width: 72px; flex-shrink: 0;
+    }
+
+    .ai-option-bar-track {
+        flex: 1; height: 5px;
+        background: var(--border);
+        border-radius: 3px; overflow: hidden;
+    }
+
+    .ai-option-bar-fill { height: 100%; border-radius: 3px; }
+
+    .ai-option-bar-pct {
+        font-size: 0.68rem; font-weight: 600;
+        color: var(--text-primary);
+        width: 30px; text-align: right; flex-shrink: 0;
+    }
+
+    .ai-select-indicator {
+        width: 100%; margin-top: 14px; padding: 8px;
+        border-radius: 6px; font-size: 0.8rem; font-weight: 600;
+        text-align: center;
+        border: 1.5px solid var(--navy);
+        background: transparent; color: var(--navy);
+        pointer-events: none;
+    }
+
+    .ai-option-card.selected .ai-select-indicator {
+        background: var(--navy); color: white;
+    }
+
+    .instrument-tabs {
+        display: flex; gap: 4px;
+        padding: 0 20px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .instrument-tab {
+        padding: 10px 12px;
+        font-size: 0.775rem; font-weight: 500;
+        color: var(--text-muted);
+        cursor: pointer; border: none;
         border-bottom: 2px solid transparent;
         margin-bottom: -1px;
-        transition: var(--transition);
+        transition: all 0.2s;
         background: none;
-        border-top: none;
-        border-left: none;
-        border-right: none;
         font-family: var(--font-body);
     }
 
-    .tab:hover { color: var(--text-primary); }
+    .instrument-tab:hover { color: var(--text-primary); }
 
-    .tab.active {
+    .instrument-tab.active {
         color: var(--navy);
         border-bottom-color: var(--navy);
         font-weight: 600;
     }
 
-    .tab-content { display: none; }
-    .tab-content.active { display: block; }
+    .instrument-content { display: none; }
+    .instrument-content.active { display: block; }
 
-    .rate-card {
+    .instrument-card {
+        display: flex; align-items: flex-start; gap: 14px;
+        padding: 14px 16px;
         background: var(--bg-primary);
         border: 1px solid var(--border);
-        border-radius: var(--radius-md);
-        padding: var(--space-md) var(--space-lg);
-        text-align: center;
+        border-radius: 8px;
+        margin-bottom: 8px;
+        transition: all 0.2s;
     }
 
-    .rate-label {
-        font-size: 0.75rem;
-        font-weight: 600;
-        color: var(--text-muted);
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-        margin-bottom: var(--space-xs);
+    .instrument-card:hover { border-color: var(--navy); background: white; }
+
+    .instrument-ticker {
+        font-size: 0.875rem; font-weight: 700;
+        color: var(--text-primary);
+        min-width: 60px;
     }
 
-    .rate-value {
-        font-family: var(--font-heading);
-        font-size: 1.5rem;
-        font-weight: 700;
+    .instrument-details { flex: 1; }
+
+    .instrument-name {
+        font-size: 0.8rem; color: var(--text-secondary);
+        margin-bottom: 4px; font-weight: 500;
     }
 
-    .suitability-note {
-        background: var(--bg-primary);
-        border: 1px solid var(--border);
-        border-radius: var(--radius-md);
-        padding: var(--space-lg);
-        font-family: var(--font-body);
-        font-size: 0.8rem;
-        color: var(--text-secondary);
-        line-height: 1.8;
-        white-space: pre-wrap;
+    .instrument-reasoning {
+        font-size: 0.75rem; color: var(--text-muted); line-height: 1.5;
+    }
+
+    .instrument-right { text-align: right; flex-shrink: 0; }
+
+    .instrument-pct {
+        font-size: 0.9rem; font-weight: 700;
+        color: var(--navy); display: block;
+    }
+
+    .instrument-amount { font-size: 0.75rem; color: var(--text-muted); }
+
+    .conviction-badge {
+        font-size: 0.65rem; font-weight: 700;
+        padding: 2px 7px; border-radius: 10px;
+        display: inline-block; margin-top: 4px;
+    }
+
+    .conviction-high { background: var(--success-bg); color: var(--success); }
+    .conviction-medium { background: #fef3c7; color: var(--warning); }
+
+    .hold-badge {
+        display: inline-block;
+        font-size: 0.68rem; font-weight: 700;
+        padding: 2px 8px; border-radius: 10px;
+        margin-top: 6px;
+    }
+
+    .hold-badge.tactical {
+        background: #fff3cd; color: #856404;
+        border: 1px solid #ffc107;
+    }
+
+    .hold-badge.strategic {
+        background: #d1ecf1; color: #0c5460;
+        border: 1px solid #bee5eb;
+    }
+
+    .hold-badge.income {
+        background: #d4edda; color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+
+    .hold-badge.core {
+        background: #e8eaf6; color: #3949ab;
+        border: 1px solid #c5cae9;
+    }
+
+    .reasoning-card {
+        background: white; border: 1px solid var(--border);
+        border-radius: 10px; padding: 20px 24px; margin-bottom: 16px;
+    }
+
+    .reasoning-title {
+        font-family: var(--font-heading); font-size: 1rem;
+        color: var(--text-primary);
+        margin-bottom: 12px; padding-bottom: 10px;
+        border-bottom: 1px solid var(--border-light);
+    }
+
+    .reasoning-text {
+        font-size: 0.875rem; color: var(--text-secondary);
+        line-height: 1.75; margin-bottom: 16px;
+    }
+
+    .consideration-item {
+        display: flex; align-items: flex-start;
+        gap: 10px; font-size: 0.825rem;
+        color: var(--text-secondary); margin-bottom: 8px;
+    }
+
+    .consideration-dot {
+        width: 6px; height: 6px; border-radius: 50%;
+        background: var(--accent); flex-shrink: 0; margin-top: 6px;
+    }
+
+    .flag-card {
+        display: flex; align-items: flex-start; gap: 10px;
+        padding: 12px 16px; border-radius: 8px;
+        margin-bottom: 8px; font-size: 0.825rem;
+    }
+
+    .flag-warning {
+        background: var(--warning-bg); color: #92400e;
+        border: 1px solid #fbd38d;
+    }
+
+    .market-context {
+        background: var(--navy); border-radius: 8px;
+        padding: 14px 18px; margin-bottom: 20px;
+    }
+
+    .market-context-label {
+        font-size: 0.65rem; font-weight: 700;
+        color: rgba(255,255,255,0.45);
+        letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 6px;
+    }
+
+    .market-context-text {
+        font-size: 0.825rem; color: rgba(255,255,255,0.8); line-height: 1.6;
+    }
+
+    .advisor-note {
+        background: #fef3c7; border: 1px solid #fbd38d;
+        border-radius: 8px; padding: 14px 18px; margin-bottom: 20px;
+        font-size: 0.825rem; color: #92400e; line-height: 1.6;
+        display: flex; gap: 10px; align-items: flex-start;
+    }
+
+    .actions-bar {
+        display: flex; gap: 12px; align-items: center;
+        padding: 20px 0; border-top: 1px solid var(--border);
+        margin-top: 8px; flex-wrap: wrap;
     }
 
     .empty-state {
-        text-align: center;
-        padding: var(--space-3xl) var(--space-xl);
-        color: var(--text-muted);
+        text-align: center; padding: 60px 20px;
+        background: white; border: 1px solid var(--border);
+        border-radius: 12px;
     }
 
-    .empty-state-icon {
-        font-size: 3rem;
-        margin-bottom: var(--space-lg);
-        opacity: 0.4;
+    .empty-icon { font-size: 3rem; opacity: 0.3; margin-bottom: 16px; }
+
+    .empty-title {
+        font-family: var(--font-heading); font-size: 1.4rem;
+        color: var(--text-secondary); margin-bottom: 8px;
     }
 
-    .empty-state-title {
+    .section-divider {
+        display: flex; align-items: center; gap: 12px;
+        margin: 20px 0; font-size: 0.7rem; font-weight: 700;
+        color: var(--text-muted); letter-spacing: 0.1em;
+        text-transform: uppercase;
+    }
+
+    .section-divider::before, .section-divider::after {
+        content: ''; flex: 1; height: 1px; background: var(--border);
+    }
+
+    .ai-badge {
+        font-size: 0.65rem; font-weight: 700;
+        background: var(--success-bg); color: var(--success);
+        border: 1px solid #c6f6d5; border-radius: 4px;
+        padding: 1px 5px; margin-left: 4px;
+    }
+
+    .customize-panel {
+        background: white;
+        border: 2px solid var(--accent);
+        border-radius: 12px;
+        padding: 24px;
+        margin-bottom: 20px;
+        display: none;
+    }
+
+    .customize-panel.open { display: block; }
+
+    .customize-title {
         font-family: var(--font-heading);
-        font-size: 1.5rem;
-        color: var(--text-secondary);
-        margin-bottom: var(--space-sm);
+        font-size: 1.1rem; color: var(--text-primary);
+        margin-bottom: 4px;
+    }
+
+    .customize-sub {
+        font-size: 0.8rem; color: var(--text-muted);
+        margin-bottom: 20px; padding-bottom: 16px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .alloc-slider-row {
+        display: grid;
+        grid-template-columns: 120px 1fr 55px;
+        gap: 12px; align-items: center;
+        margin-bottom: 12px;
+    }
+
+    .alloc-slider-label {
+        font-size: 0.8rem; font-weight: 600;
+        color: var(--text-primary);
+    }
+
+    .alloc-slider {
+        width: 100%; accent-color: var(--navy); cursor: pointer;
+    }
+
+    .alloc-slider-val {
+        font-size: 0.875rem; font-weight: 700;
+        color: var(--navy); text-align: right;
+    }
+
+    .alloc-total {
+        display: flex; align-items: center;
+        justify-content: space-between;
+        padding: 10px 14px;
+        border-radius: 8px;
+        background: var(--bg-primary);
+        border: 1px solid var(--border);
+        margin-bottom: 8px;
+        font-size: 0.875rem;
+    }
+
+    .alloc-total-label { font-weight: 600; color: var(--text-primary); }
+    .alloc-total-val { font-size: 1.1rem; font-weight: 700; }
+    .alloc-total-val.ok { color: var(--success); }
+    .alloc-total-val.over { color: var(--error); }
+
+    .instr-editor-tabs {
+        display: flex; gap: 4px;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 16px;
+    }
+
+    .instr-editor-tab {
+        padding: 8px 12px;
+        font-size: 0.775rem; font-weight: 500;
+        color: var(--text-muted);
+        cursor: pointer; border: none;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -1px; background: none;
+        font-family: var(--font-body);
+        transition: all 0.2s;
+    }
+
+    .instr-editor-tab:hover { color: var(--text-primary); }
+
+    .instr-editor-tab.active {
+        color: var(--navy);
+        border-bottom-color: var(--navy);
+        font-weight: 600;
+    }
+
+    .instr-editor-content { display: none; }
+    .instr-editor-content.active { display: block; }
+
+    .instr-row {
+        display: flex; align-items: center; gap: 10px;
+        padding: 10px 12px;
+        background: var(--bg-primary);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        margin-bottom: 6px;
+    }
+
+    .instr-row-ticker {
+        font-size: 0.875rem; font-weight: 700;
+        color: var(--text-primary); min-width: 55px;
+    }
+
+    .instr-row-name {
+        flex: 1; font-size: 0.8rem; color: var(--text-muted);
+    }
+
+    .instr-row-pct {
+        font-size: 0.875rem; font-weight: 700;
+        color: var(--navy); min-width: 36px; text-align: right;
+    }
+
+    .instr-remove-btn {
+        width: 24px; height: 24px;
+        border-radius: 50%; border: 1px solid var(--border);
+        background: white; color: var(--error);
+        font-size: 0.9rem; cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0; line-height: 1;
+    }
+
+    .instr-remove-btn:hover { background: var(--error); color: white; }
+
+    .add-instr-row {
+        display: flex; gap: 8px; align-items: center;
+        margin-top: 10px;
+    }
+
+    .add-instr-input {
+        flex: 1; height: 36px;
+        background: white;
+        border: 1.5px solid var(--border);
+        border-radius: 6px; padding: 0 10px;
+        font-size: 0.875rem; font-family: var(--font-body);
+        color: var(--text-primary); outline: none;
+        text-transform: uppercase;
+        transition: border-color 0.2s;
+    }
+
+    .add-instr-input:focus { border-color: var(--navy); }
+
+    .add-instr-pct {
+        width: 70px; height: 36px;
+        background: white;
+        border: 1.5px solid var(--border);
+        border-radius: 6px; padding: 0 10px;
+        font-size: 0.875rem; font-family: var(--font-body);
+        color: var(--text-primary); outline: none;
+        transition: border-color 0.2s;
+    }
+
+    .add-instr-pct:focus { border-color: var(--navy); }
+
+    .add-instr-btn {
+        height: 36px; padding: 0 14px;
+        background: var(--navy); color: white;
+        border: none; border-radius: 6px;
+        font-size: 0.8rem; font-weight: 600;
+        cursor: pointer; font-family: var(--font-body);
+        white-space: nowrap; transition: all 0.2s;
+    }
+
+    .add-instr-btn:hover { opacity: 0.9; }
+
+    .ticker-feedback {
+        font-size: 0.75rem; margin-top: 4px; min-height: 18px;
+    }
+
+    .ticker-feedback.valid { color: var(--success); }
+    .ticker-feedback.invalid { color: var(--error); }
+    .ticker-feedback.loading { color: var(--text-muted); }
+
+    .empty-category {
+        text-align: center; padding: 20px;
+        color: var(--text-muted); font-size: 0.825rem;
+        background: var(--bg-primary);
+        border: 1px dashed var(--border);
+        border-radius: 8px;
     }
 </style>
 {% endblock %}
 
 {% block page_content %}
-
-<!-- ── Page Header ─────────────────────────────────────── -->
-<div class="section-header mb-xl">
-    <div>
-        <h1 class="section-title">New Recommendation</h1>
-        <p class="section-subtitle">
-            Enter a client profile to generate an AI-powered portfolio allocation
-        </p>
-    </div>
-</div>
-
-<!-- ── Two Column Layout ──────────────────────────────── -->
 <div class="portal-layout">
 
-    <!-- ── LEFT: Input Form ───────────────────────────── -->
+    <!-- ── LEFT: Form ─────────────────────────────────── -->
     <div class="portal-sidebar">
         <div class="card">
             <div class="card-header">
                 <div class="card-title">Client Profile</div>
                 <div class="card-subtitle">
-                    Enter the client details below
+                    Enter details to generate AI recommendation
                 </div>
             </div>
 
-            <form method="POST" action="{{ url_for('main.portal') }}" id="portal-form">
+            <form method="POST"
+                  action="{{ url_for('main.portal') }}"
+                  id="portal-form">
 
-                <!-- Client Name -->
                 <div class="form-group">
                     <label class="form-label" for="client_name">
                         Client Name *
                     </label>
-                    <input
-                        type="text"
-                        id="client_name"
-                        name="client_name"
-                        class="form-input"
-                        placeholder="e.g. John Smith"
-                        value="{{ form_data.get('client_name', '') }}"
-                        required
-                    >
+                    <input type="text" id="client_name"
+                           name="client_name" class="form-input"
+                           placeholder="e.g. John Smith"
+                           value="{{ form_data.get('client_name', '') if form_data else '' }}"
+                           required>
                 </div>
 
-                <!-- Age and Life Stage -->
-                <div class="grid-2">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
                     <div class="form-group">
                         <label class="form-label" for="age">Age</label>
-                        <input
-                            type="number"
-                            id="age"
-                            name="age"
-                            class="form-input"
-                            min="18"
-                            max="90"
-                            value="{{ form_data.get('age', 45) }}"
-                            required
-                        >
+                        <input type="number" id="age" name="age"
+                               class="form-input" min="18" max="90"
+                               value="{{ form_data.get('age', 45) if form_data else 45 }}"
+                               required>
                     </div>
                     <div class="form-group">
                         <label class="form-label" for="life_stage">
                             Life Stage
                         </label>
-                        <select id="life_stage" name="life_stage" class="form-select">
-                            {% for stage in ["Early Career", "Mid-Career", "Pre-Retirement", "Retirement"] %}
+                        <select id="life_stage" name="life_stage"
+                                class="form-select">
+                            {% for stage in ["Early Career", "Mid-Career",
+                               "Pre-Retirement", "Retirement"] %}
                             <option value="{{ stage }}"
-                                {{ "selected" if form_data.get("life_stage") == stage else "" }}>
+                                {{ "selected" if form_data and
+                                   form_data.get("life_stage") == stage }}>
                                 {{ stage }}
                             </option>
                             {% endfor %}
@@ -305,37 +627,25 @@
                     </div>
                 </div>
 
-                <!-- Investment Amount -->
                 <div class="form-group">
                     <label class="form-label" for="amount">
                         Investment Amount ($)
                     </label>
-                    <input
-                        type="number"
-                        id="amount"
-                        name="amount"
-                        class="form-input"
-                        min="1000"
-                        max="10000000"
-                        step="1000"
-                        value="{{ form_data.get('amount', 100000) }}"
-                        required
-                    >
+                    <input type="number" id="amount" name="amount"
+                           class="form-input" min="1000" step="1000"
+                           value="{{ form_data.get('amount', 100000) if form_data else 100000 }}"
+                           required>
                 </div>
 
-                <!-- Risk Tolerance -->
                 <div class="form-group">
                     <label class="form-label">Risk Tolerance</label>
                     <div class="risk-options">
                         {% for level in ["Low", "Medium", "High"] %}
                         <div class="risk-option">
-                            <input
-                                type="radio"
-                                id="risk_{{ level }}"
-                                name="risk"
-                                value="{{ level }}"
-                                {{ "checked" if form_data.get("risk", "Medium") == level else "" }}
-                            >
+                            <input type="radio"
+                                   id="risk_{{ level }}"
+                                   name="risk" value="{{ level }}"
+                                   {{ "checked" if (form_data and form_data.get("risk", "Medium") == level) or (not form_data and level == "Medium") }}>
                             <label class="risk-label" for="risk_{{ level }}">
                                 {{ level }}
                             </label>
@@ -344,37 +654,30 @@
                     </div>
                 </div>
 
-                <!-- Time Horizon -->
                 <div class="form-group">
-                    <label class="form-label" for="horizon">
+                    <label class="form-label">
                         Time Horizon —
                         <span id="horizon-value">
-                            {{ form_data.get('horizon', 10) }}
+                            {{ form_data.get('horizon', 10) if form_data else 10 }}
                         </span> years
                     </label>
-                    <input
-                        type="range"
-                        id="horizon"
-                        name="horizon"
-                        class="form-range"
-                        min="1"
-                        max="30"
-                        value="{{ form_data.get('horizon', 10) }}"
-                        oninput="updateRangeValue(this, 'horizon-value')"
-                    >
-                    <div class="range-labels">
+                    <input type="range" id="horizon" name="horizon"
+                           min="1" max="30"
+                           value="{{ form_data.get('horizon', 10) if form_data else 10 }}"
+                           style="width:100%;margin:8px 0"
+                           oninput="document.getElementById('horizon-value').textContent=this.value">
+                    <div style="display:flex;justify-content:space-between;
+                                font-size:0.72rem;color:var(--text-muted)">
                         <span>1 year</span>
                         <span>30 years</span>
                     </div>
                 </div>
 
-                <!-- Submit -->
-                <button
-                    type="submit"
-                    class="btn btn-primary btn-full"
-                    id="submit-btn"
-                >
-                    Generate Recommendation
+                <button type="button"
+                        class="btn btn-primary btn-full"
+                        id="submit-btn"
+                        onclick="submitPortalForm()">
+                    🤖 Generate AI Recommendation
                 </button>
 
             </form>
@@ -382,32 +685,36 @@
     </div>
 
     <!-- ── RIGHT: Results ─────────────────────────────── -->
-    <div class="portal-results">
+    <div>
 
         {% if not result %}
-        <!-- Empty state — no recommendation yet -->
-        <div class="card">
-            <div class="empty-state">
-                <div class="empty-state-icon">📊</div>
-                <div class="empty-state-title">
-                    Ready to analyze
-                </div>
-                <p>
-                    Fill in the client profile on the left and click
-                    Generate Recommendation to see the AI-powered
-                    portfolio allocation with live market data.
-                </p>
-            </div>
+        <div class="empty-state">
+            <div class="empty-icon">🤖</div>
+            <div class="empty-title">Ready to analyze</div>
+            <p style="color:var(--text-muted);font-size:0.875rem;
+                      max-width:400px;margin:0 auto;line-height:1.7">
+                Fill in the client profile and click Generate AI
+                Recommendation to receive 4 portfolio options with
+                Equity ETFs, Growth Stocks, Bond ETFs, Mutual Funds
+                and CDs — with full AI reasoning for each.
+            </p>
         </div>
 
         {% else %}
-        <!-- Results — recommendation generated -->
 
-        <!-- ── Client Summary ──────────────────────── -->
-        <div class="stats-grid" style="grid-template-columns: 1fr 1fr 1fr">
+        {% if result.ai_fallback %}
+        <div class="advisor-note">
+            ⚠ AI temporarily unavailable. Standard allocation shown.
+        </div>
+        {% endif %}
+
+        <!-- Client Summary -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;
+                    gap:16px;margin-bottom:20px">
             <div class="stat-card">
                 <div class="stat-label">Client</div>
-                <div class="stat-value" style="font-size:1.2rem">
+                <div class="stat-value"
+                     style="font-size:1.1rem;line-height:1.3">
                     {{ result.client_name }}
                 </div>
                 <div class="stat-sub">
@@ -416,9 +723,11 @@
             </div>
             <div class="stat-card">
                 <div class="stat-label">Investment</div>
-                <div class="stat-value">${{ "{:,}".format(result.amount) }}</div>
+                <div class="stat-value">
+                    ${{ "{:,}".format(result.amount) }}
+                </div>
                 <div class="stat-sub">
-                    {{ result.horizon }}-year horizon · {{ result.risk }} risk
+                    {{ result.horizon }}-year · {{ result.risk }} risk
                 </div>
             </div>
             <div class="stat-card">
@@ -430,305 +739,829 @@
             </div>
         </div>
 
-        <!-- ── Allocation Breakdown ────────────────── -->
-        <div class="divider">
-            <div class="divider-line"></div>
-            <div class="divider-label">Portfolio Allocation</div>
-            <div class="divider-line"></div>
+        <!-- Market Context -->
+        {% if result.ai_data and result.ai_data.market_context %}
+        <div class="market-context">
+            <div class="market-context-label">🤖 AI Market Context</div>
+            <div class="market-context-text">
+                {{ result.ai_data.market_context }}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Advisor Note -->
+        <div class="advisor-note">
+            <span style="flex-shrink:0">⚖</span>
+            <span>
+                {% if result.ai_data and result.ai_data.advisor_note %}
+                    {{ result.ai_data.advisor_note }}
+                {% else %}
+                    The licensed advisor makes the final decision.
+                    Review each option against the client's complete
+                    financial picture before proceeding.
+                {% endif %}
+            </span>
         </div>
 
-        <div class="card">
-            {% set colors = ["#2c4a6e", "#d4a853", "#2d7d4f", "#c53030", "#6b46c1"] %}
-            {% for instrument, data in result.dollar_allocation.items() %}
-            {% set color = colors[loop.index0 % colors|length] %}
-            <div style="margin-bottom: var(--space-lg)">
-                <div class="flex-between mb-sm">
-                    <span style="font-weight:600;color:var(--text-primary);font-size:0.9rem">
-                        {{ instrument }}
-                    </span>
-                    <div style="text-align:right">
-                        <span style="font-weight:700;color:var(--text-primary)">
-                            {{ data.percentage }}%
-                        </span>
-                        <span style="color:var(--text-muted);font-size:0.8rem;margin-left:8px">
-                            ${{ "{:,}".format(data.amount) }}
-                        </span>
+        {% if result.ai_options %}
+        <div class="section-divider">Select a Portfolio Option</div>
+
+        <div class="ai-options-grid">
+            {% for option in result.ai_options %}
+            <div class="ai-option-card
+                 {% if option.recommended %}recommended{% endif %}
+                 {% if loop.first %}selected{% endif %}"
+                 id="option-card-{{ option.id }}"
+                 onclick="selectOption('{{ option.id }}')">
+
+                <div class="ai-option-id">{{ option.id }}</div>
+                <div class="ai-option-name">{{ option.name }}</div>
+                <div class="ai-option-tagline">{{ option.tagline }}</div>
+
+                <div class="ai-option-bars">
+                    {% set colors = {
+                        'equity_etfs':   '#2c4a6e',
+                        'growth_stocks': '#d4a853',
+                        'bond_etfs':     '#2d7d4f',
+                        'mutual_funds':  '#6b46c1',
+                        'cds':           '#c53030'
+                    } %}
+                    {% set labels = {
+                        'equity_etfs':   'Equity ETFs',
+                        'growth_stocks': 'Growth Stks',
+                        'bond_etfs':     'Bond ETFs',
+                        'mutual_funds':  'Mut. Funds',
+                        'cds':           'CDs'
+                    } %}
+                    {% for key, pct in option.allocation.items() %}
+                    <div class="ai-option-bar-row">
+                        <div class="ai-option-bar-label">
+                            {{ labels.get(key, key) }}
+                        </div>
+                        <div class="ai-option-bar-track">
+                            <div class="ai-option-bar-fill"
+                                 style="width:{{ pct }}%;
+                                        background:{{ colors.get(key,'#8892a4') }}">
+                            </div>
+                        </div>
+                        <div class="ai-option-bar-pct">{{ pct }}%</div>
                     </div>
+                    {% endfor %}
                 </div>
-                <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden">
-                    <div style="height:100%;width:{{ data.percentage }}%;background:{{ color }};border-radius:4px"></div>
+
+                <div class="ai-select-indicator">
+                    {% if loop.first %}✓ Selected
+                    {% else %}Select This Option{% endif %}
                 </div>
             </div>
             {% endfor %}
         </div>
 
-        <!-- ── Live Market Data ────────────────────── -->
-        {% if result.market_data %}
-        <div class="divider">
-            <div class="divider-line"></div>
-            <div class="divider-label">Live Market Data</div>
-            <div class="divider-line"></div>
-        </div>
+        {% for option in result.ai_options %}
+        <div id="detail-{{ option.id }}"
+             class="option-detail"
+             style="{{ 'display:block' if loop.first else 'display:none' }}">
 
-        <div class="card">
-            <!-- Tabs -->
-            <div class="tabs">
-                <button class="tab active" onclick="showTab('stocks-lt', this)">
-                    📈 Stocks LT
-                </button>
-                <button class="tab" onclick="showTab('stocks-st', this)">
-                    ⚡ Stocks ST
-                </button>
-                <button class="tab" onclick="showTab('bonds', this)">
-                    🏦 Bonds
-                </button>
-                <button class="tab" onclick="showTab('mutual-funds', this)">
-                    📊 Mutual Funds
-                </button>
-                <button class="tab" onclick="showTab('rates', this)">
-                    💰 Rates
-                </button>
+            {% if option.instruments %}
+            <div class="section-divider">
+                AI Instrument Picks — {{ option.name }}
             </div>
 
-            <!-- Stocks Long Term -->
-            <div id="stocks-lt" class="tab-content active">
-                {% for stock in result.market_data.stocks_lt %}
-                <div class="instrument-card">
-                    <div class="instrument-ticker">
-                        {{ stock.ticker }}
-                        <span class="live-badge">LIVE</span>
-                    </div>
-                    <div class="instrument-name">{{ stock.name }}</div>
-                    <div class="instrument-price">${{ stock.price }}</div>
-                    <div class="instrument-detail">
-                        Div: {{ stock.dividend_yield }}
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-
-            <!-- Stocks Short Term -->
-            <div id="stocks-st" class="tab-content">
-                {% for stock in result.market_data.stocks_st %}
-                <div class="instrument-card">
-                    <div class="instrument-ticker">
-                        {{ stock.ticker }}
-                        <span class="live-badge">LIVE</span>
-                    </div>
-                    <div class="instrument-name">{{ stock.name }}</div>
-                    <div class="instrument-price">${{ stock.price }}</div>
-                    <div class="instrument-detail">
-                        P/E: {{ stock.pe_ratio }}
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-
-            <!-- Bonds -->
-            <div id="bonds" class="tab-content">
-                {% for bond in result.market_data.bonds %}
-                <div class="instrument-card">
-                    <div class="instrument-ticker">
-                        {{ bond.ticker }}
-                        <span class="live-badge">LIVE</span>
-                    </div>
-                    <div class="instrument-name">{{ bond.name }}</div>
-                    <div class="instrument-price">${{ bond.price }}</div>
-                    <div class="instrument-detail">
-                        Yield: {{ bond.dividend_yield }}
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-
-            <!-- Mutual Funds -->
-            <div id="mutual-funds" class="tab-content">
-                {% for fund in result.market_data.mutual_funds %}
-                <div class="instrument-card">
-                    <div class="instrument-ticker">
-                        {{ fund.ticker }}
-                        <span class="live-badge">LIVE</span>
-                    </div>
-                    <div class="instrument-name">{{ fund.name }}</div>
-                    <div class="instrument-price">${{ fund.price }}</div>
-                    <div class="instrument-detail">
-                        Exp: {{ fund.expense_ratio }}
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-
-            <!-- Rates -->
-            <div id="rates" class="tab-content">
-                <p style="font-size:0.75rem;font-weight:600;color:var(--text-muted);
-                letter-spacing:0.08em;text-transform:uppercase;margin-bottom:var(--space-md)">
-                    US Treasury Rates
-                </p>
-                <div class="grid-3" style="margin-bottom:var(--space-lg)">
-                    {% set rate_items = [
-                        ("3-Month", result.market_data.rates.get("3_month_treasury")),
-                        ("1-Year", result.market_data.rates.get("1_year_treasury")),
-                        ("10-Year", result.market_data.rates.get("10_year_treasury"))
+            <div class="card"
+                 style="padding:0;overflow:hidden;margin-bottom:20px">
+                <div class="instrument-tabs">
+                    {% set tabs = [
+                        ('equity_etfs',   '📊 Equity ETFs'),
+                        ('growth_stocks', '📈 Growth Stocks'),
+                        ('bond_etfs',     '🏦 Bond ETFs'),
+                        ('mutual_funds',  '💼 Mutual Funds'),
+                        ('cds',           '💰 CDs')
                     ] %}
-                    {% for label, rate in rate_items %}
-                    <div class="rate-card">
-                        <div class="rate-label">{{ label }} Treasury</div>
-                        <div class="rate-value" style="color:var(--navy)">
-                            {{ rate }}% if rate else "N/A"
+                    {% for key, label in tabs %}
+                    <button class="instrument-tab
+                            {% if loop.first %}active{% endif %}"
+                            onclick="showTab('tab-{{ option.id }}-{{ key }}',
+                                     this, 'group-{{ option.id }}')">
+                        {{ label }}
+                    </button>
+                    {% endfor %}
+                </div>
+
+                <div style="padding:16px 20px">
+                    {% for key, label in tabs %}
+                    <div id="tab-{{ option.id }}-{{ key }}"
+                         class="instrument-content
+                         {% if loop.first %}active{% endif %}"
+                         data-group="group-{{ option.id }}">
+
+                        {% set instruments = option.instruments.get(key, []) %}
+                        {% if instruments %}
+                            {% for inst in instruments %}
+                            <div class="instrument-card">
+                                <div>
+                                    <div class="instrument-ticker">
+                                        {{ inst.ticker }}
+                                        <span class="ai-badge">AI</span>
+                                    </div>
+                                    <div class="conviction-badge
+                                         {% if inst.conviction == 'High' %}conviction-high
+                                         {% else %}conviction-medium{% endif %}">
+                                        {{ inst.conviction }} Conviction
+                                    </div>
+                                </div>
+                                <div class="instrument-details">
+                                    <div class="instrument-name">
+                                        {{ inst.name }}
+                                    </div>
+                                    <div class="instrument-reasoning">
+                                        {{ inst.reasoning }}
+                                    </div>
+                                    <div style="margin-top:6px">
+                                        {% set hp = inst.hold_period %}
+                                        {% if 'Tactical' in hp or 'tactical' in hp %}
+                                        <span class="hold-badge tactical">
+                                            ⚡ {{ hp }}
+                                        </span>
+                                        {% elif 'Income' in hp or 'income' in hp %}
+                                        <span class="hold-badge income">
+                                            💰 {{ hp }}
+                                        </span>
+                                        {% elif 'Core' in hp or 'core' in hp %}
+                                        <span class="hold-badge core">
+                                            📌 {{ hp }}
+                                        </span>
+                                        {% else %}
+                                        <span class="hold-badge strategic">
+                                            📌 {{ hp }}
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="instrument-right">
+                                    <span class="instrument-pct">
+                                        {{ inst.allocation_pct }}%
+                                    </span>
+                                    <div class="instrument-amount">
+                                        ${{ "{:,}".format(inst.dollar_amount|int) }}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <p style="color:var(--text-muted);
+                                      font-size:0.825rem;
+                                      text-align:center;padding:24px">
+                                No instruments in this category.
+                            </p>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="reasoning-card">
+                <div class="reasoning-title">
+                    🤖 AI Reasoning — {{ option.name }}
+                </div>
+                <div class="reasoning-text">{{ option.reasoning }}</div>
+
+                {% if option.key_considerations %}
+                <div style="font-size:0.72rem;font-weight:700;
+                            color:var(--text-muted);
+                            letter-spacing:0.08em;text-transform:uppercase;
+                            margin-bottom:10px">
+                    Key Considerations for Advisor
+                </div>
+                {% for point in option.key_considerations %}
+                <div class="consideration-item">
+                    <div class="consideration-dot"></div>
+                    <span>{{ point }}</span>
+                </div>
+                {% endfor %}
+                {% endif %}
+            </div>
+
+            {% if option.flags %}
+            <div style="margin-bottom:16px">
+                {% for flag in option.flags %}
+                <div class="flag-card flag-warning">⚠ {{ flag }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="reasoning-card">
+                <div class="reasoning-title">
+                    📋 Suitability Assessment Note
+                </div>
+                <div style="font-size:0.8rem;color:var(--text-secondary);
+                            line-height:1.8;white-space:pre-wrap;
+                            background:var(--bg-primary);
+                            border:1px solid var(--border-light);
+                            border-radius:6px;padding:14px 16px">
+                    {{ result.suitability_note }}
+                </div>
+            </div>
+
+            <div class="section-divider">Advisor Customization</div>
+
+            <div style="margin-bottom:16px">
+                <button class="btn btn-outline"
+                        onclick="toggleCustomize('{{ option.id }}')">
+                    ✏ Customize This Option
+                </button>
+            </div>
+
+            <div class="customize-panel"
+                 id="customize-{{ option.id }}">
+                <div class="customize-title">
+                    Customize Option {{ option.id }} — {{ option.name }}
+                </div>
+                <div class="customize-sub">
+                    Adjust category allocations and instruments.
+                    Total must equal 100%.
+                </div>
+
+                <div style="font-size:0.75rem;font-weight:700;
+                            color:var(--text-muted);letter-spacing:0.08em;
+                            text-transform:uppercase;margin-bottom:12px">
+                    Category Allocations
+                </div>
+
+                {% set cat_colors = {
+                    'equity_etfs':   '#2c4a6e',
+                    'growth_stocks': '#d4a853',
+                    'bond_etfs':     '#2d7d4f',
+                    'mutual_funds':  '#6b46c1',
+                    'cds':           '#c53030'
+                } %}
+                {% set cat_labels = {
+                    'equity_etfs':   'Equity ETFs',
+                    'growth_stocks': 'Growth Stocks',
+                    'bond_etfs':     'Bond ETFs',
+                    'mutual_funds':  'Mutual Funds',
+                    'cds':           'CDs'
+                } %}
+
+                <div style="margin-bottom:16px">
+                    {% for key, pct in option.allocation.items() %}
+                    <div class="alloc-slider-row">
+                        <div class="alloc-slider-label"
+                             style="color:{{ cat_colors.get(key,'#8892a4') }}">
+                            {{ cat_labels.get(key, key) }}
+                        </div>
+                        <input type="range"
+                               class="alloc-slider"
+                               id="slider-{{ option.id }}-{{ key }}"
+                               min="0" max="100"
+                               value="{{ pct }}"
+                               oninput="onSliderChange('{{ option.id }}',
+                                        '{{ key }}', this.value)">
+                        <div class="alloc-slider-val"
+                             id="sliderval-{{ option.id }}-{{ key }}">
+                            {{ pct }}%
                         </div>
                     </div>
                     {% endfor %}
                 </div>
 
-                <p style="font-size:0.75rem;font-weight:600;color:var(--text-muted);
-                letter-spacing:0.08em;text-transform:uppercase;margin-bottom:var(--space-md)">
-                    CD Rates (Estimated)
-                </p>
-                <div class="grid-3">
-                    {% set cd_items = [
-                        ("3-Month CD", result.market_data.rates.get("cd_3_month")),
-                        ("6-Month CD", result.market_data.rates.get("cd_6_month")),
-                        ("1-Year CD", result.market_data.rates.get("cd_1_year"))
+                <div class="alloc-total">
+                    <span class="alloc-total-label">Total Allocation</span>
+                    <span class="alloc-total-val ok"
+                          id="total-{{ option.id }}">100%</span>
+                </div>
+
+                <div id="total-warn-{{ option.id }}"
+                     style="display:none;font-size:0.8rem;
+                            font-weight:600;color:var(--error);
+                            background:#fff5f5;
+                            border:1px solid #fed7d7;
+                            border-radius:6px;
+                            padding:10px 14px;
+                            margin-bottom:16px">
+                </div>
+
+                <div style="font-size:0.75rem;font-weight:700;
+                            color:var(--text-muted);letter-spacing:0.08em;
+                            text-transform:uppercase;margin-bottom:12px">
+                    Edit Instruments
+                </div>
+
+                <div class="instr-editor-tabs">
+                    {% for key, label in [
+                        ('equity_etfs',   '📊 Equity ETFs'),
+                        ('growth_stocks', '📈 Growth Stocks'),
+                        ('bond_etfs',     '🏦 Bond ETFs'),
+                        ('mutual_funds',  '💼 Mutual Funds'),
+                        ('cds',           '💰 CDs')
                     ] %}
-                    {% for label, rate in cd_items %}
-                    <div class="rate-card">
-                        <div class="rate-label">{{ label }}</div>
-                        <div class="rate-value" style="color:var(--success)">
-                            {{ rate }}% if rate else "N/A"
-                        </div>
-                    </div>
+                    <button class="instr-editor-tab
+                            {% if loop.first %}active{% endif %}"
+                            onclick="showEditorTab(
+                                'edit-{{ option.id }}-{{ key }}',
+                                this,
+                                'editgroup-{{ option.id }}')">
+                        {{ label }}
+                    </button>
                     {% endfor %}
                 </div>
 
-                <p style="font-size:0.75rem;color:var(--text-muted);
-                margin-top:var(--space-md);line-height:1.6">
-                    ⚠ CD rates are estimates based on current Treasury spreads.
-                    Verify current rates with specific banks before recommending.
-                </p>
-            </div>
+                {% for key, label in [
+                    ('equity_etfs',   '📊 Equity ETFs'),
+                    ('growth_stocks', '📈 Growth Stocks'),
+                    ('bond_etfs',     '🏦 Bond ETFs'),
+                    ('mutual_funds',  '💼 Mutual Funds'),
+                    ('cds',           '💰 CDs')
+                ] %}
+                <div id="edit-{{ option.id }}-{{ key }}"
+                     class="instr-editor-content
+                     {% if loop.first %}active{% endif %}"
+                     data-group="editgroup-{{ option.id }}">
 
-        </div>
-        {% endif %}
+                    <div id="instr-list-{{ option.id }}-{{ key }}">
+                        {% set instruments = option.instruments.get(key, []) %}
+                        {% if instruments %}
+                            {% for inst in instruments %}
+                            <div class="instr-row"
+                                 id="instr-{{ option.id }}-{{ key }}-{{ loop.index0 }}">
+                                <div class="instr-row-ticker">
+                                    {{ inst.ticker }}
+                                </div>
+                                <div class="instr-row-name">
+                                    {{ inst.name }}
+                                </div>
+                                <div class="instr-row-pct">
+                                    {{ inst.allocation_pct }}%
+                                </div>
+                                <button class="instr-remove-btn"
+                                        onclick="removeInstrument(
+                                            'instr-{{ option.id }}-{{ key }}-{{ loop.index0 }}')">
+                                    ×
+                                </button>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="empty-category"
+                                 id="empty-{{ option.id }}-{{ key }}">
+                                No instruments. Add one below.
+                            </div>
+                        {% endif %}
+                    </div>
 
-        <!-- ── Advisor Flags ───────────────────────── -->
-        <div class="divider">
-            <div class="divider-line"></div>
-            <div class="divider-label">Advisor Flags</div>
-            <div class="divider-line"></div>
-        </div>
+                    <div class="add-instr-row">
+                        <input type="text"
+                               class="add-instr-input"
+                               id="addticker-{{ option.id }}-{{ key }}"
+                               placeholder="Ticker (e.g. VOO)"
+                               maxlength="10"
+                               oninput="validateTicker(this,
+                                        '{{ option.id }}',
+                                        '{{ key }}')">
+                        <input type="number"
+                               class="add-instr-pct"
+                               id="addpct-{{ option.id }}-{{ key }}"
+                               placeholder="%" min="1" max="100">
+                        <button class="add-instr-btn"
+                                onclick="addInstrument(
+                                    '{{ option.id }}',
+                                    '{{ key }}')">
+                            + Add
+                        </button>
+                    </div>
+                    <div class="ticker-feedback"
+                         id="feedback-{{ option.id }}-{{ key }}">
+                    </div>
 
-        <div style="margin-bottom:var(--space-xl)">
-            {% for flag in result.flags %}
-            <div class="flash flash-{{ flag.type }}" style="margin-bottom:var(--space-sm)">
-                {{ flag.message }}
-            </div>
-            {% endfor %}
-        </div>
+                </div>
+                {% endfor %}
 
-        <!-- ── Suitability Note ────────────────────── -->
-        <div class="divider">
-            <div class="divider-line"></div>
-            <div class="divider-label">Suitability Documentation</div>
-            <div class="divider-line"></div>
-        </div>
-
-        <div class="card">
-            <div class="card-header">
-                <div class="card-title">Suitability Assessment Note</div>
-                <div class="card-subtitle">
-                    Auto-generated compliance documentation —
-                    review and sign before filing
+                <div style="display:flex;gap:12px;margin-top:20px;
+                            padding-top:16px;
+                            border-top:1px solid var(--border)">
+                    <button class="btn btn-primary"
+                            onclick="saveClient('{{ option.id }}',
+                                     '{{ option.name }}', true)">
+                        💾 Save Customized Version
+                    </button>
+                    <button class="btn btn-ghost"
+                            onclick="toggleCustomize('{{ option.id }}')">
+                        Cancel
+                    </button>
                 </div>
             </div>
-            <div class="suitability-note">{{ result.suitability_note }}</div>
+
+            <div class="actions-bar">
+                <button type="button" class="btn btn-primary"
+                        onclick="saveClient('{{ option.id }}',
+                                 '{{ option.name }}', false)">
+                    💾 Save Client — Option {{ option.id }}
+                </button>
+                <a href="{{ url_for('main.portal') }}"
+                   class="btn btn-ghost">
+                    + New Recommendation
+                </a>
+            </div>
+
         </div>
+        {% endfor %}
+        {% endif %}
 
-        <!-- ── Actions ────────────────────────────── -->
-        <div class="flex gap-md" style="margin-bottom:var(--space-2xl)">
-
-    <!-- Save Client Form -->
-    <form method="POST" action="{{ url_for('main.save_client_route') }}"
-          style="display:inline">
-
-        <!-- Hidden fields carry all the data -->
-        <input type="hidden" name="client_name"
-               value="{{ result.client_name }}">
-        <input type="hidden" name="age"
-               value="{{ result.age }}">
-        <input type="hidden" name="life_stage"
-               value="{{ result.life_stage }}">
-        <input type="hidden" name="amount"
-               value="{{ result.amount }}">
-        <input type="hidden" name="risk"
-               value="{{ result.risk }}">
-        <input type="hidden" name="horizon"
-               value="{{ result.horizon }}">
-        <input type="hidden" name="allocation"
-               value="{{ result.allocation_json }}">
-        <input type="hidden" name="score"
-               value="{{ result.score }}">
-        <input type="hidden" name="flags"
-               value="{{ result.flags_json }}">
-        <input type="hidden" name="suitability_note"
-               value="{{ result.suitability_note }}">
-
-        <button type="submit" class="btn btn-primary">
-            💾 Save Client Profile
-        </button>
-    </form>
-
-    <button class="btn btn-accent"
-        onclick="alert('Save the client profile first, then download the PDF from the Clients page.')">
-    📄 Download PDF Report
-    </button>
-
-    <a href="{{ url_for('main.portal') }}" class="btn btn-ghost">
-        + New Recommendation
-    </a>
-
-</div>
-
-        <!-- ── Disclaimer ──────────────────────────── -->
-        <div style="font-size:0.75rem;color:var(--text-muted);
-        border-top:1px solid var(--border);padding-top:var(--space-lg);
-        margin-bottom:var(--space-2xl);line-height:1.6">
-            ⚖ This recommendation was generated by AdvisorNest as decision
-            support for licensed financial advisors only. All recommendations
-            require advisor review and client suitability assessment before
-            implementation. Not financial advice.
+        <div style="font-size:0.72rem;color:var(--text-muted);
+                    border-top:1px solid var(--border);
+                    padding-top:16px;margin-top:8px;line-height:1.6">
+            ⚖ These recommendations are generated by AdvisorNest AI
+            as decision support for licensed financial advisors only.
+            <strong>The advisor makes the final decision</strong> on
+            all recommendations. All options require advisor review
+            and client suitability assessment before implementation.
+            Not financial advice.
         </div>
 
         {% endif %}
-
     </div>
 </div>
+
+<!-- Full screen loading overlay -->
+<div id="loading-overlay"
+     style="display:none;position:fixed;inset:0;
+            background:rgba(26,26,46,0.85);
+            z-index:9999;
+            flex-direction:column;
+            align-items:center;
+            justify-content:center;
+            backdrop-filter:blur(4px)">
+    <div style="background:white;border-radius:16px;
+                padding:40px 48px;text-align:center;
+                max-width:420px;width:90%;
+                box-shadow:0 24px 64px rgba(0,0,0,0.3)">
+        <div style="font-size:3rem;margin-bottom:16px">🤖</div>
+        <div style="font-family:var(--font-heading);
+                    font-size:1.3rem;
+                    color:var(--text-primary);
+                    margin-bottom:8px"
+             id="loading-msg">
+            Analyzing client profile...
+        </div>
+        <div style="font-size:0.825rem;color:var(--text-muted);
+                    margin-bottom:24px;line-height:1.5"
+             id="loading-sub">
+            Age, risk, horizon, life stage
+        </div>
+        <div style="height:4px;background:var(--border);
+                    border-radius:4px;overflow:hidden;
+                    margin-bottom:20px">
+            <div id="loading-bar"
+                 style="height:100%;width:0%;
+                        background:var(--navy);
+                        border-radius:4px;
+                        transition:width 0.6s ease">
+            </div>
+        </div>
+        <div style="font-size:0.75rem;color:var(--text-muted)">
+            This usually takes 10-15 seconds
+        </div>
+    </div>
+</div>
+
+<!-- Hidden master save form -->
+<form method="POST"
+      action="{{ url_for('main.save_client_route') }}"
+      id="master-save-form"
+      style="display:none">
+    <input type="hidden" name="client_name"      id="save-client_name">
+    <input type="hidden" name="age"              id="save-age">
+    <input type="hidden" name="life_stage"       id="save-life_stage">
+    <input type="hidden" name="amount"           id="save-amount">
+    <input type="hidden" name="risk"             id="save-risk">
+    <input type="hidden" name="horizon"          id="save-horizon">
+    <input type="hidden" name="allocation"       id="save-allocation">
+    <input type="hidden" name="score"            id="save-score"
+           value="{{ result.score if result else 0 }}">
+    <input type="hidden" name="flags"            id="save-flags"
+           value="{{ result.flags|tojson|forceescape if result else '[]' }}">
+    <input type="hidden" name="suitability_note" id="save-suitability"
+           value="{{ result.suitability_note|forceescape if result else '' }}">
+    <input type="hidden" name="selected_option"  id="save-selected_option">
+    <input type="hidden" name="ai_data"          id="save-ai_data" value="">
+</form>
+
+{% if result and result.ai_options %}
+<script>
+window.AI_ALLOCATIONS = {
+    {% for option in result.ai_options %}
+    "{{ option.id }}": {{ option.allocation | tojson }}{% if not loop.last %},{% endif %}
+    {% endfor %}
+};
+
+window.CUSTOM_ALLOCATIONS = {
+    {% for option in result.ai_options %}
+    "{{ option.id }}": {{ option.allocation | tojson }}{% if not loop.last %},{% endif %}
+    {% endfor %}
+};
+
+window.AI_OPTIONS = {{ result.ai_options | tojson }};
+
+window.AI_MARKET_CONTEXT = {{ result.ai_data.market_context | tojson if result.ai_data and result.ai_data.market_context else '""' }};
+
+window.AI_ADVISOR_NOTE = {{ result.ai_data.advisor_note | tojson if result.ai_data and result.ai_data.advisor_note else '""' }};
+</script>
+{% endif %}
 
 {% endblock %}
 
 {% block extra_js %}
 <script>
-// Tab switching for market data
-function showTab(tabId, button) {
-    // Hide all tab contents
-    document.querySelectorAll('.tab-content').forEach(function(content) {
-        content.classList.remove('active');
+function submitPortalForm() {
+    const btn     = document.getElementById('submit-btn');
+    const overlay = document.getElementById('loading-overlay');
+    const bar     = document.getElementById('loading-bar');
+    const msg     = document.getElementById('loading-msg');
+    const sub     = document.getElementById('loading-sub');
+
+    if (btn) btn.disabled = true;
+    if (overlay) overlay.style.display = 'flex';
+
+    const messages = [
+        ['Analyzing client profile', 'Age, risk, horizon, life stage'],
+        ['Fetching live market data', 'Treasury rates and CD rates'],
+        ['AI selecting instruments', 'From approved universe'],
+        ['Building 4 portfolio options', 'Capital Preservation to Aggressive Growth'],
+        ['Generating AI reasoning', 'Suitability and key considerations'],
+        ['Almost ready', 'Finalizing your recommendations']
+    ];
+
+    let step = 0;
+    let dotCount = 0;
+
+    setInterval(function() {
+        if (step < messages.length) {
+            if (sub) sub.textContent = messages[step][1];
+            if (bar) bar.style.width =
+                ((step + 1) / messages.length * 90) + '%';
+            step++;
+        }
+    }, 2000);
+
+    setInterval(function() {
+        if (msg && step <= messages.length) {
+            const currentMsg = messages[Math.min(step, messages.length - 1)][0];
+            const dots = '.'.repeat((dotCount % 3) + 1);
+            msg.textContent = currentMsg + dots;
+            dotCount++;
+        }
+    }, 400);
+
+    setTimeout(function() {
+        document.getElementById('portal-form').submit();
+    }, 100);
+}
+
+function selectOption(optionId) {
+    document.querySelectorAll('.ai-option-card').forEach(function(card) {
+        card.classList.remove('selected');
+        const ind = card.querySelector('.ai-select-indicator');
+        if (ind) ind.textContent = 'Select This Option';
     });
 
-    // Remove active from all tabs
-    document.querySelectorAll('.tab').forEach(function(tab) {
-        tab.classList.remove('active');
-    });
+    const selected = document.getElementById('option-card-' + optionId);
+    if (selected) {
+        selected.classList.add('selected');
+        const ind = selected.querySelector('.ai-select-indicator');
+        if (ind) ind.textContent = '✓ Selected';
+    }
 
-    // Show selected tab
-    document.getElementById(tabId).classList.add('active');
+    document.querySelectorAll('.option-detail').forEach(function(d) {
+        d.style.display = 'none';
+    });
+    const detail = document.getElementById('detail-' + optionId);
+    if (detail) detail.style.display = 'block';
+}
+
+function showTab(tabId, button, group) {
+    document.querySelectorAll('[data-group="' + group + '"]').forEach(function(c) {
+        c.classList.remove('active');
+    });
+    button.closest('.card').querySelectorAll('.instrument-tab').forEach(function(t) {
+        t.classList.remove('active');
+    });
+    const tab = document.getElementById(tabId);
+    if (tab) tab.classList.add('active');
     button.classList.add('active');
 }
 
-// Show loading state when form submitted
-document.getElementById('portal-form').addEventListener('submit', function() {
-    const btn = document.getElementById('submit-btn');
-    btn.textContent = 'Fetching live market data...';
-    btn.disabled = true;
-});
+function showEditorTab(tabId, button, group) {
+    document.querySelectorAll('[data-group="' + group + '"]').forEach(function(c) {
+        c.classList.remove('active');
+    });
+    button.closest('.customize-panel').querySelectorAll('.instr-editor-tab').forEach(function(t) {
+        t.classList.remove('active');
+    });
+    const tab = document.getElementById(tabId);
+    if (tab) tab.classList.add('active');
+    button.classList.add('active');
+}
+
+function toggleCustomize(optionId) {
+    const panel = document.getElementById('customize-' + optionId);
+    if (panel) panel.classList.toggle('open');
+}
+
+function onSliderChange(optionId, changedKey, newValue) {
+    if (typeof window.CUSTOM_ALLOCATIONS === 'undefined') return;
+    newValue = parseInt(newValue);
+
+    window.CUSTOM_ALLOCATIONS[optionId][changedKey] = newValue;
+
+    const val = document.getElementById(
+        'sliderval-' + optionId + '-' + changedKey);
+    if (val) val.textContent = newValue + '%';
+
+    const alloc = window.CUSTOM_ALLOCATIONS[optionId];
+    const total = Object.values(alloc).reduce((a, b) => a + b, 0);
+
+    const totalEl = document.getElementById('total-' + optionId);
+    if (totalEl) {
+        totalEl.textContent = total + '%';
+        totalEl.className = 'alloc-total-val ' +
+            (total === 100 ? 'ok' : 'over');
+    }
+
+    const warnEl = document.getElementById('total-warn-' + optionId);
+    if (warnEl) {
+        if (total !== 100) {
+            warnEl.style.display = 'block';
+            warnEl.textContent = total > 100
+                ? '⚠ Total is ' + total + '% — reduce one category by ' + (total - 100) + '%'
+                : '⚠ Total is ' + total + '% — increase one category by ' + (100 - total) + '%';
+        } else {
+            warnEl.style.display = 'none';
+        }
+    }
+}
+
+let validateTimer = null;
+const tickerCache = {};
+
+function validateTicker(input, optionId, category) {
+    const ticker   = input.value.trim().toUpperCase();
+    const feedback = document.getElementById(
+        'feedback-' + optionId + '-' + category);
+
+    if (!ticker) {
+        if (feedback) feedback.textContent = '';
+        return;
+    }
+
+    if (tickerCache[ticker]) {
+        const data = tickerCache[ticker];
+        if (feedback) {
+            feedback.textContent = '✓ ' + data.name;
+            feedback.className = 'ticker-feedback valid';
+        }
+        return;
+    }
+
+    clearTimeout(validateTimer);
+    if (feedback) {
+        feedback.textContent = 'Checking...';
+        feedback.className = 'ticker-feedback loading';
+    }
+
+    validateTimer = setTimeout(function() {
+        fetch('/validate-ticker/' + ticker)
+            .then(r => r.json())
+            .then(data => {
+                if (data.valid) {
+                    tickerCache[ticker] = data;
+                    if (feedback) {
+                        feedback.textContent = '✓ ' + data.name +
+                            (data.price ? ' · $' + data.price : '');
+                        feedback.className = 'ticker-feedback valid';
+                    }
+                } else {
+                    if (feedback) {
+                        feedback.textContent = '✗ Ticker not found';
+                        feedback.className = 'ticker-feedback invalid';
+                    }
+                }
+            })
+            .catch(() => {
+                if (feedback) {
+                    feedback.textContent = 'Could not validate';
+                    feedback.className = 'ticker-feedback invalid';
+                }
+            });
+    }, 600);
+}
+
+function addInstrument(optionId, category) {
+    const tickerInput = document.getElementById(
+        'addticker-' + optionId + '-' + category);
+    const pctInput    = document.getElementById(
+        'addpct-' + optionId + '-' + category);
+    const feedback    = document.getElementById(
+        'feedback-' + optionId + '-' + category);
+
+    const ticker = tickerInput ? tickerInput.value.trim().toUpperCase() : '';
+    const pct    = pctInput ? parseInt(pctInput.value) : 0;
+
+    if (!ticker) {
+        if (feedback) {
+            feedback.textContent = 'Please enter a ticker symbol';
+            feedback.className = 'ticker-feedback invalid';
+        }
+        return;
+    }
+
+    if (!pct || pct < 1 || pct > 100) {
+        if (feedback) {
+            feedback.textContent = 'Please enter a valid percentage (1-100)';
+            feedback.className = 'ticker-feedback invalid';
+        }
+        return;
+    }
+
+    const cachedData = tickerCache[ticker];
+    const name = cachedData ? cachedData.name : ticker;
+
+    const list  = document.getElementById(
+        'instr-list-' + optionId + '-' + category);
+    const empty = document.getElementById(
+        'empty-' + optionId + '-' + category);
+    if (empty) empty.remove();
+
+    const rowId = 'instr-custom-' + Date.now();
+    const row = document.createElement('div');
+    row.className = 'instr-row';
+    row.id = rowId;
+    row.innerHTML =
+        '<div class="instr-row-ticker">' + ticker + '</div>' +
+        '<div class="instr-row-name">' + name + '</div>' +
+        '<div class="instr-row-pct">' + pct + '%</div>' +
+        '<button class="instr-remove-btn" ' +
+        'onclick="removeInstrument(\'' + rowId + '\')">×</button>';
+    if (list) list.appendChild(row);
+
+    if (tickerInput) tickerInput.value = '';
+    if (pctInput) pctInput.value = '';
+    if (feedback) {
+        feedback.textContent = '✓ ' + ticker + ' added';
+        feedback.className = 'ticker-feedback valid';
+        setTimeout(function() { feedback.textContent = ''; }, 2000);
+    }
+}
+
+function removeInstrument(rowId) {
+    const row = document.getElementById(rowId);
+    if (row) row.remove();
+}
+
+function saveClient(optionId, optionName, useCustom) {
+    const portalForm = document.getElementById('portal-form');
+    const saveForm   = document.getElementById('master-save-form');
+
+    if (!portalForm || !saveForm) return;
+
+    ['client_name', 'age', 'life_stage', 'amount', 'horizon'].forEach(
+        function(name) {
+            const src = portalForm.querySelector('[name="' + name + '"]');
+            const dst = document.getElementById('save-' + name);
+            if (src && dst) dst.value = src.value;
+        }
+    );
+
+    const riskEl = portalForm.querySelector('input[name="risk"]:checked');
+    if (riskEl) document.getElementById('save-risk').value = riskEl.value;
+
+    const alloc = useCustom
+        ? window.CUSTOM_ALLOCATIONS[optionId]
+        : window.AI_ALLOCATIONS[optionId];
+
+    document.getElementById('save-allocation').value =
+        JSON.stringify(alloc || {});
+
+    document.getElementById('save-selected_option').value =
+        optionId + ' - ' + optionName +
+        (useCustom ? ' (Advisor Customized)' : '');
+
+    // Save full AI data for recommendations history
+    const aiDataEl = document.getElementById('save-ai_data');
+    if (aiDataEl) {
+        try {
+            const aiPayload = {
+                options:        window.AI_OPTIONS        || [],
+                market_context: window.AI_MARKET_CONTEXT || '',
+                advisor_note:   window.AI_ADVISOR_NOTE   || ''
+            };
+            aiDataEl.value = JSON.stringify(aiPayload);
+            console.log('AI data saved, options:', aiPayload.options.length);
+        } catch(e) {
+            console.log('AI data error:', e);
+            aiDataEl.value = '{}';
+        }
+    }
+
+    saveForm.submit();
+}
 </script>
 {% endblock %}

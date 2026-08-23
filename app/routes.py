@@ -1,3 +1,9 @@
+from recommendations_db import (
+    save_recommendation, get_all_recommendations,
+    get_client_recommendations, get_recommendation,
+    delete_recommendation, get_recommendation_count
+)
+from ai_logic import generate_ai_recommendation, get_fallback_recommendation
 from notes_db import get_all_notes, get_client_notes, add_note, delete_note, get_note_count, update_note
 from notes_db import get_all_notes, get_client_notes, add_note, delete_note, get_note_count
 from pdf_generator import generate_pdf_report
@@ -248,6 +254,59 @@ def settings():
         advisor=advisor,
         email=session["advisor"]["email"],
         client_count=client_count)
+# ── All Recommendations ───────────────────────────────────
+@main.route("/recommendations")
+def recommendations():
+    if not session.get("logged_in"):
+        flash("Please log in to continue.", "info")
+        return redirect(url_for("main.login"))
+
+    advisor_id = session["advisor"]["user_id"]
+    all_recs   = get_all_recommendations(advisor_id)
+    all_clients = get_all_clients(advisor_id)
+    selected_client = request.args.get("client", "")
+
+    if selected_client:
+        all_recs = [r for r in all_recs
+                    if r.get("client_id") == selected_client]
+
+    return render_template("recommendations/list.html",
+        advisor=session.get("advisor"),
+        recommendations=all_recs,
+        clients=all_clients,
+        selected_client=selected_client)
+
+
+# ── View Recommendation ───────────────────────────────────
+@main.route("/recommendations/<rec_id>")
+def view_recommendation(rec_id):
+    if not session.get("logged_in"):
+        flash("Please log in to continue.", "info")
+        return redirect(url_for("main.login"))
+
+    advisor_id = session["advisor"]["user_id"]
+    rec = get_recommendation(advisor_id, rec_id)
+
+    if not rec:
+        flash("Recommendation not found.", "error")
+        return redirect(url_for("main.recommendations"))
+
+    return render_template("recommendations/view.html",
+        advisor=session.get("advisor"),
+        rec=rec)
+
+
+# ── Delete Recommendation ─────────────────────────────────
+@main.route("/recommendations/delete/<rec_id>",
+            methods=["POST"])
+def delete_recommendation_route(rec_id):
+    if not session.get("logged_in"):
+        return redirect(url_for("main.login"))
+
+    advisor_id = session["advisor"]["user_id"]
+    delete_recommendation(advisor_id, rec_id)
+    flash("Recommendation deleted.", "success")
+    return redirect(url_for("main.recommendations"))
 
 # ── Reset Password ────────────────────────────────────────
 @main.route("/reset-password", methods=["GET", "POST"])
@@ -361,29 +420,45 @@ def portal():
                 form_data=form_data,
                 result=None)
 
-        # Run core logic
-        allocation       = calculate_allocation(risk, horizon, age)
-        score            = portfolio_score(risk, horizon, age)
-        flags            = get_advisor_flags(risk, horizon, age)
-        suitability_note = generate_suitability_note(
-            client_name, age, life_stage,
-            risk, horizon, amount, allocation
-        )
-
-        # Fetch live market data
+        # Fetch live market data first
         try:
             market_data = get_all_market_data(risk)
         except Exception:
             market_data = None
 
-        # Calculate dollar amounts
-        dollar_allocation = {
-            instrument: {
-                "percentage": pct,
-                "amount":     round((pct / 100) * amount)
-            }
-            for instrument, pct in allocation.items()
-        }
+        # Generate AI recommendation
+        ai_result = generate_ai_recommendation(
+            client_name, age, life_stage, risk,
+            horizon, amount,
+            market_data if market_data else {}
+        )
+
+     # Use fallback if AI fails
+        if not ai_result["success"]:
+            ai_result = get_fallback_recommendation(
+                risk, age, horizon, amount)
+            ai_fallback = True
+        else:
+            ai_fallback = ai_result.get("fallback", False)
+
+        print("AI fallback:", ai_fallback)
+        print("AI success:", ai_result["success"])
+
+        ai_data    = ai_result["data"]
+        ai_options = ai_data["options"]
+        print("=== AI OPTIONS DEBUG ===")
+        print("Type:", type(ai_options))
+        print("First option type:", type(ai_options[0]) if ai_options else "empty")
+        print("First option keys:", ai_options[0].keys() if ai_options else "empty")
+
+        # Still run rule-based for score and legacy support
+        allocation = calculate_allocation(risk, horizon, age)
+        score      = portfolio_score(risk, horizon, age)
+        flags      = get_advisor_flags(risk, horizon, age)
+        suitability_note = generate_suitability_note(
+            client_name, age, life_stage,
+            risk, horizon, amount, allocation
+        )
 
         # Score color and label
         if score >= 80:
@@ -396,24 +471,38 @@ def portal():
             score_color = "error"
             score_label = "Needs Review"
 
-        result = {
-            "client_name":       client_name,
-            "age":               age,
-            "life_stage":        life_stage,
-            "amount":            amount,
-            "risk":              risk,
-            "horizon":           horizon,
-            "allocation":        allocation,
-            "dollar_allocation": dollar_allocation,
-            "score":             score,
-            "score_color":       score_color,
-            "score_label":       score_label,
-            "flags":             flags,
-            "market_data":       market_data,
-            "suitability_note":  suitability_note,
+        # Default to recommended option for saving
+        recommended = next(
+            (o for o in ai_options if o.get("recommended")),
+            ai_options[0]
+        )
+        allocation = {
+            "equity_etfs":   recommended["allocation"].get("equity_etfs", 30),
+            "growth_stocks": recommended["allocation"].get("growth_stocks", 10),
+            "bond_etfs":     recommended["allocation"].get("bond_etfs", 35),
+            "mutual_funds":  recommended["allocation"].get("mutual_funds", 15),
+            "cds":           recommended["allocation"].get("cds", 10),
         }
 
-        # Pre-convert to JSON for hidden form fields
+        result = {
+            "client_name":      client_name,
+            "age":              age,
+            "life_stage":       life_stage,
+            "amount":           amount,
+            "risk":             risk,
+            "horizon":          horizon,
+            "allocation":       allocation,
+            "score":            score,
+            "score_color":      score_color,
+            "score_label":      score_label,
+            "flags":            flags,
+            "market_data":      market_data,
+            "suitability_note": suitability_note,
+            "ai_options":       ai_options,
+            "ai_data":          ai_data,
+            "ai_fallback":      ai_fallback,
+        }
+
         result["allocation_json"] = json.dumps(allocation)
         result["flags_json"]      = json.dumps(flags)
 
@@ -431,22 +520,50 @@ def save_client_route():
 
     advisor_id = session["advisor"]["user_id"]
 
-    client_data = {
-        "client_name":      request.form.get("client_name"),
-        "age":              int(request.form.get("age")),
-        "life_stage":       request.form.get("life_stage"),
-        "amount":           int(request.form.get("amount")),
-        "risk":             request.form.get("risk"),
-        "horizon":          int(request.form.get("horizon")),
-        "allocation":       json.loads(request.form.get("allocation")),
-        "score":            int(request.form.get("score")),
-        "flags":            json.loads(request.form.get("flags")),
-        "suitability_note": request.form.get("suitability_note"),
-    }
+    age     = request.form.get("age")
+    amount  = request.form.get("amount")
+    horizon = request.form.get("horizon")
+    score   = request.form.get("score")
 
+    client_data = {
+        "client_name":      request.form.get("client_name", ""),
+        "age":              int(age) if age else 0,
+        "life_stage":       request.form.get("life_stage", ""),
+        "amount":           int(float(amount)) if amount else 0,
+        "risk":             request.form.get("risk", ""),
+        "horizon":          int(horizon) if horizon else 0,
+        "allocation":       json.loads(request.form.get("allocation", "{}")),
+        "score":            int(score) if score else 0,
+        "flags":            json.loads(request.form.get("flags", "[]")),
+        "suitability_note": request.form.get("suitability_note", ""),
+        "selected_option":  request.form.get("selected_option", ""),
+    }
     result = save_client(advisor_id, client_data)
 
     if result["success"]:
+        # Also save the full AI recommendation
+        try:
+            ai_data_raw = request.form.get("ai_data", "{}")
+            ai_data = json.loads(ai_data_raw) if ai_data_raw else {}
+        except Exception:
+            ai_data = {}
+        print("=== SAVING RECOMMENDATION ===")
+        print("ai_data_raw:", request.form.get("ai_data", "NOT FOUND")[:100])
+        
+        save_recommendation(advisor_id, result.get("client_id"), {
+            "client_name":     client_data["client_name"],
+            "age":             client_data["age"],
+            "life_stage":      client_data["life_stage"],
+            "amount":          client_data["amount"],
+            "risk":            client_data["risk"],
+            "horizon":         client_data["horizon"],
+            "selected_option": client_data.get("selected_option", ""),
+            "ai_data":         ai_data,
+            "allocation":      client_data["allocation"],
+            "suitability_note": client_data["suitability_note"],
+            "score":           client_data["score"],
+        })
+
         flash(result["message"], "success")
     else:
         flash(result["message"], "error")
@@ -644,3 +761,25 @@ def logout():
     session.clear()
     flash("You have been logged out successfully.", "info")
     return redirect(url_for("main.login"))
+
+# ── Validate Ticker ───────────────────────────────────────
+@main.route("/validate-ticker/<ticker>")
+def validate_ticker(ticker):
+    if not session.get("logged_in"):
+        return json.dumps({"valid": False})
+    try:
+        import yfinance as yf
+        t = yf.Ticker(ticker.upper())
+        info = t.info
+        name = info.get("longName") or info.get("shortName", "")
+        price = info.get("regularMarketPrice") or info.get("currentPrice", 0)
+        if name:
+            return json.dumps({
+                "valid": True,
+                "ticker": ticker.upper(),
+                "name": name,
+                "price": price
+            })
+        return json.dumps({"valid": False})
+    except Exception:
+        return json.dumps({"valid": False})

@@ -1,0 +1,411 @@
+{% extends "base.html" %}
+
+{% block title %}{{ rec.client_name }} Recommendation — AdvisorNest{% endblock %}
+{% block page_title %}{{ rec.client_name }} — {{ rec.selected_option }}{% endblock %}
+{% block page_subtitle %}Generated on {{ rec.created_at[:10] }}{% endblock %}
+
+{% block page_action %}
+    <a href="{{ url_for('main.recommendations') }}"
+       class="btn btn-ghost">
+        ← All Recommendations
+    </a>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .view-layout {
+        display: grid;
+        grid-template-columns: 1fr 300px;
+        gap: 24px;
+        align-items: start;
+    }
+
+    .ai-option-card {
+        background: white;
+        border: 2px solid var(--border);
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 12px;
+        transition: all 0.2s;
+        position: relative;
+    }
+
+    .ai-option-card.selected-option {
+        border-color: var(--navy);
+        background: #fafcff;
+    }
+
+    .ai-option-card.selected-option::before {
+        content: 'Advisor Selected';
+        position: absolute;
+        top: 12px; right: 12px;
+        font-size: 0.65rem;
+        font-weight: 700;
+        color: white;
+        background: var(--navy);
+        padding: 2px 8px;
+        border-radius: 10px;
+    }
+
+    .ai-option-id {
+        width: 28px; height: 28px;
+        border-radius: 50%;
+        background: var(--navy);
+        color: white;
+        font-size: 0.8rem; font-weight: 700;
+        display: flex; align-items: center; justify-content: center;
+        margin-bottom: 10px;
+    }
+
+    .ai-option-card.selected-option .ai-option-id {
+        background: var(--accent);
+    }
+
+    .ai-option-name {
+        font-family: var(--font-heading);
+        font-size: 1rem; font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 4px;
+    }
+
+    .ai-option-tagline {
+        font-size: 0.775rem;
+        color: var(--text-muted);
+        margin-bottom: 14px;
+    }
+
+    .alloc-bars {
+        display: flex; flex-direction: column; gap: 5px;
+        margin-bottom: 12px;
+    }
+
+    .alloc-bar-row { display: flex; align-items: center; gap: 8px; }
+
+    .alloc-bar-label {
+        font-size: 0.68rem; color: var(--text-muted);
+        width: 80px; flex-shrink: 0;
+    }
+
+    .alloc-bar-track {
+        flex: 1; height: 5px;
+        background: var(--border); border-radius: 3px; overflow: hidden;
+    }
+
+    .alloc-bar-fill { height: 100%; border-radius: 3px; }
+
+    .alloc-bar-pct {
+        font-size: 0.68rem; font-weight: 600;
+        color: var(--text-primary);
+        width: 30px; text-align: right; flex-shrink: 0;
+    }
+
+    .reasoning-card {
+        background: white; border: 1px solid var(--border);
+        border-radius: 10px; padding: 20px 24px; margin-bottom: 16px;
+    }
+
+    .reasoning-title {
+        font-family: var(--font-heading); font-size: 1rem;
+        color: var(--text-primary);
+        margin-bottom: 12px; padding-bottom: 10px;
+        border-bottom: 1px solid var(--border-light);
+    }
+
+    .market-context {
+        background: var(--navy); border-radius: 8px;
+        padding: 14px 18px; margin-bottom: 20px;
+    }
+
+    .market-context-label {
+        font-size: 0.65rem; font-weight: 700;
+        color: rgba(255,255,255,0.45);
+        letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 6px;
+    }
+
+    .market-context-text {
+        font-size: 0.825rem; color: rgba(255,255,255,0.8); line-height: 1.6;
+    }
+
+    .section-divider {
+        display: flex; align-items: center; gap: 12px;
+        margin: 20px 0; font-size: 0.7rem; font-weight: 700;
+        color: var(--text-muted); letter-spacing: 0.1em;
+        text-transform: uppercase;
+    }
+
+    .section-divider::before, .section-divider::after {
+        content: ''; flex: 1; height: 1px; background: var(--border);
+    }
+
+    /* Right panel */
+    .right-panel {
+        position: sticky;
+        top: 88px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .info-card {
+        background: white;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 18px 20px;
+    }
+
+    .info-card-title {
+        font-size: 0.75rem; font-weight: 700;
+        color: var(--text-muted);
+        letter-spacing: 0.08em; text-transform: uppercase;
+        margin-bottom: 12px; padding-bottom: 8px;
+        border-bottom: 1px solid var(--border-light);
+    }
+
+    .info-row {
+        display: flex; justify-content: space-between;
+        align-items: center;
+        padding: 6px 0;
+        border-bottom: 1px solid var(--border-light);
+        font-size: 0.825rem;
+    }
+
+    .info-row:last-child { border-bottom: none; }
+
+    .info-label { color: var(--text-muted); }
+    .info-value { font-weight: 600; color: var(--text-primary); }
+</style>
+{% endblock %}
+
+{% block page_content %}
+
+<div class="view-layout">
+
+    <!-- Left: Recommendation detail -->
+    <div>
+
+        <!-- Market context -->
+        {% if rec.ai_data and rec.ai_data.get('market_context') %}
+        <div class="market-context">
+            <div class="market-context-label">
+                🤖 AI Market Context at Time of Generation
+            </div>
+            <div class="market-context-text">
+                {{ rec.ai_data.market_context }}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Advisor note -->
+        {% if rec.ai_data and rec.ai_data.get('advisor_note') %}
+        <div style="background:#fef3c7;border:1px solid #fbd38d;
+                    border-radius:8px;padding:14px 18px;
+                    margin-bottom:20px;font-size:0.825rem;
+                    color:#92400e;line-height:1.6;
+                    display:flex;gap:10px;align-items:flex-start">
+            <span>⚖</span>
+            <span>{{ rec.ai_data.advisor_note }}</span>
+        </div>
+        {% endif %}
+
+        <!-- All 4 options -->
+        {% if rec.ai_data and rec.ai_data.get('options') %}
+        <div class="section-divider">Portfolio Options Generated</div>
+
+        {% set alloc_colors = {
+            'equity_etfs':   '#2c4a6e',
+            'growth_stocks': '#d4a853',
+            'bond_etfs':     '#2d7d4f',
+            'mutual_funds':  '#6b46c1',
+            'cds':           '#c53030'
+        } %}
+        {% set alloc_labels = {
+            'equity_etfs':   'Equity ETFs',
+            'growth_stocks': 'Growth Stks',
+            'bond_etfs':     'Bond ETFs',
+            'mutual_funds':  'Mut. Funds',
+            'cds':           'CDs'
+        } %}
+
+        {% for option in rec.ai_data.options %}
+        <div class="ai-option-card
+            {% if rec.selected_option and rec.selected_option.startswith(option.id + ' -') %}
+             selected-option{% endif %}">
+
+            <div class="ai-option-id">{{ option.id }}</div>
+            <div class="ai-option-name">{{ option.name }}</div>
+            <div class="ai-option-tagline">{{ option.tagline }}</div>
+
+            <div class="alloc-bars">
+                {% for key, pct in option.allocation.items() %}
+                <div class="alloc-bar-row">
+                    <div class="alloc-bar-label">
+                        {{ alloc_labels.get(key, key) }}
+                    </div>
+                    <div class="alloc-bar-track">
+                        <div class="alloc-bar-fill"
+                             style="width:{{ pct }}%;
+                                    background:{{ alloc_colors.get(key,'#8892a4') }}">
+                        </div>
+                    </div>
+                    <div class="alloc-bar-pct">{{ pct }}%</div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Reasoning -->
+            <div style="font-size:0.825rem;color:var(--text-secondary);
+                        line-height:1.7;margin-bottom:10px">
+                {{ option.reasoning }}
+            </div>
+
+            <!-- Key considerations -->
+            {% if option.key_considerations %}
+            <div style="font-size:0.72rem;font-weight:700;
+                        color:var(--text-muted);
+                        letter-spacing:0.08em;text-transform:uppercase;
+                        margin-bottom:8px">
+                Key Considerations
+            </div>
+            {% for point in option.key_considerations %}
+            <div style="display:flex;align-items:flex-start;gap:8px;
+                        font-size:0.8rem;color:var(--text-secondary);
+                        margin-bottom:6px">
+                <div style="width:6px;height:6px;border-radius:50%;
+                            background:var(--accent);flex-shrink:0;
+                            margin-top:5px"></div>
+                <span>{{ point }}</span>
+            </div>
+            {% endfor %}
+            {% endif %}
+
+            <!-- Flags -->
+            {% if option.flags %}
+            {% for flag in option.flags %}
+            <div style="background:var(--warning-bg);color:#92400e;
+                        border:1px solid #fbd38d;border-radius:6px;
+                        padding:8px 12px;font-size:0.8rem;margin-top:8px">
+                ⚠ {{ flag }}
+            </div>
+            {% endfor %}
+            {% endif %}
+
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        <!-- Suitability note -->
+        {% if rec.suitability_note %}
+        <div class="section-divider">Suitability Assessment Note</div>
+        <div class="reasoning-card">
+            <div style="font-size:0.8rem;color:var(--text-secondary);
+                        line-height:1.8;white-space:pre-wrap;
+                        background:var(--bg-primary);
+                        border:1px solid var(--border-light);
+                        border-radius:6px;padding:14px 16px">
+                {{ rec.suitability_note }}
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+
+    <!-- Right: Client info panel -->
+    <div class="right-panel">
+
+        <div class="info-card">
+            <div class="info-card-title">Client Profile</div>
+            <div class="info-row">
+                <span class="info-label">Name</span>
+                <span class="info-value">{{ rec.client_name }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Age</span>
+                <span class="info-value">{{ rec.age }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Life Stage</span>
+                <span class="info-value">{{ rec.life_stage }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Investment</span>
+                <span class="info-value">
+                    ${{ "{:,}".format(rec.amount) }}
+                </span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Risk</span>
+                <span class="info-value">{{ rec.risk }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Horizon</span>
+                <span class="info-value">{{ rec.horizon }} years</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Score</span>
+                <span class="info-value"
+                      style="color:var(--success)">
+                    {{ rec.score }}/100
+                </span>
+            </div>
+        </div>
+
+        <div class="info-card">
+            <div class="info-card-title">Selected Option</div>
+            <div style="font-size:0.875rem;font-weight:600;
+                        color:var(--navy);margin-bottom:8px">
+                {{ rec.selected_option or 'Not recorded' }}
+            </div>
+            <div style="font-size:0.75rem;color:var(--text-muted)">
+                Generated on {{ rec.created_at[:10] }}
+            </div>
+        </div>
+
+        {% if rec.allocation %}
+        <div class="info-card">
+            <div class="info-card-title">Final Allocation</div>
+            {% set alloc_colors = {
+                'equity_etfs':   '#2c4a6e',
+                'growth_stocks': '#d4a853',
+                'bond_etfs':     '#2d7d4f',
+                'mutual_funds':  '#6b46c1',
+                'cds':           '#c53030'
+            } %}
+            {% for key, pct in rec.allocation.items() %}
+            {% if pct > 0 %}
+            <div class="info-row">
+                <div style="display:flex;align-items:center;gap:6px">
+                    <div style="width:8px;height:8px;border-radius:50%;
+                                background:{{ alloc_colors.get(key,'#8892a4') }}">
+                    </div>
+                    <span class="info-label">
+                        {{ key.replace('_', ' ').title() }}
+                    </span>
+                </div>
+                <span class="info-value">{{ pct }}%</span>
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div style="display:flex;flex-direction:column;gap:8px">
+            <a href="{{ url_for('main.recommendations') }}"
+               class="btn btn-outline btn-full">
+                ← Back to Recommendations
+            </a>
+            <form method="POST"
+                  action="{{ url_for('main.delete_recommendation_route', rec_id=rec.id) }}"
+                  onsubmit="return confirm('Delete this recommendation?')">
+                <button type="submit"
+                        class="btn btn-ghost btn-full"
+                        style="color:var(--error)">
+                    Delete Recommendation
+                </button>
+            </form>
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}
