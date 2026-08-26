@@ -1,0 +1,299 @@
+{% extends "base.html" %}
+
+{% block title %}Terms of Service — AdvisorNest{% endblock %}
+
+{% block extra_css %}
+<style>
+    .legal-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 48px 24px;
+    }
+
+    .legal-header {
+        margin-bottom: 40px;
+        padding-bottom: 24px;
+        border-bottom: 2px solid var(--accent);
+    }
+
+    .legal-title {
+        font-family: var(--font-heading);
+        font-size: 2rem;
+        color: var(--navy);
+        margin-bottom: 8px;
+    }
+
+    .legal-date {
+        font-size: 0.875rem;
+        color: var(--text-muted);
+    }
+
+    .legal-section {
+        margin-bottom: 32px;
+    }
+
+    .legal-section-title {
+        font-family: var(--font-heading);
+        font-size: 1.1rem;
+        color: var(--navy);
+        margin-bottom: 12px;
+        padding-bottom: 6px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .legal-text {
+        font-size: 0.9rem;
+        color: var(--text-secondary);
+        line-height: 1.8;
+        margin-bottom: 12px;
+    }
+
+    .legal-list {
+        list-style: none;
+        margin: 12px 0;
+    }
+
+    .legal-list li {
+        font-size: 0.9rem;
+        color: var(--text-secondary);
+        line-height: 1.8;
+        padding: 4px 0 4px 20px;
+        position: relative;
+    }
+
+    .legal-list li::before {
+        content: '•';
+        color: var(--accent);
+        position: absolute;
+        left: 0;
+        font-weight: 700;
+    }
+
+    .legal-highlight {
+        background: var(--info-bg);
+        border: 1px solid #bee3f8;
+        border-left: 3px solid var(--navy);
+        border-radius: 6px;
+        padding: 14px 18px;
+        margin-bottom: 24px;
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+        line-height: 1.7;
+    }
+
+    .legal-contact {
+        background: var(--bg-primary);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 20px 24px;
+        margin-top: 32px;
+    }
+</style>
+{% endblock %}
+
+{% block auth_content %}
+<div class="legal-container">
+
+    <div class="legal-header">
+        <div class="legal-title">Terms of Service</div>
+        <div class="legal-date">
+            Last updated: August 2026 &nbsp;·&nbsp;
+            Effective: August 2026
+        </div>
+    </div>
+
+    <div class="legal-highlight">
+        AdvisorNest is a decision support tool for licensed financial
+        advisors only. By using AdvisorNest, you confirm that you are
+        a licensed financial professional and that all recommendations
+        generated are subject to your independent review and approval
+        before being presented to any client.
+    </div>
+
+    <div class="legal-section">
+        <div class="legal-section-title">1. Acceptance of Terms</div>
+        <p class="legal-text">
+            By accessing or using AdvisorNest ("the Service"), you agree
+            to be bound by these Terms of Service. If you do not agree to
+            these terms, you may not use the Service.
+        </p>
+        <p class="legal-text">
+            These terms apply to all users of AdvisorNest, including
+            registered financial advisors and any individuals accessing
+            the Service on behalf of a registered financial advisory firm.
+        </p>
+    </div>
+
+    <div class="legal-section">
+        <div class="legal-section-title">2. Description of Service</div>
+        <p class="legal-text">
+            AdvisorNest is an AI-powered portfolio recommendation and
+            practice management tool designed exclusively for use by
+            licensed financial advisors. The Service provides:
+        </p>
+        <ul class="legal-list">
+            <li>AI-generated portfolio allocation recommendations for client profiles</li>
+            <li>Instrument selection from a curated approved universe</li>
+            <li>AI-generated suitability assessment documentation</li>
+            <li>Client profile management and meeting notes</li>
+            <li>PDF report generation for advisor use</li>
+        </ul>
+    </div>
+
+    <div class="legal-section">
+        <div class="legal-section-title">3. Eligibility</div>
+        <p class="legal-text">
+            AdvisorNest is available only to:
+        </p>
+        <ul class="legal-list">
+            <li>Registered Investment Advisors (RIAs) registered with the SEC or applicable state securities regulators</li>
+            <li>FINRA-registered broker-dealer representatives</li>
+            <li>Licensed financial professionals operating under applicable regulatory frameworks</li>
+        </ul>
+        <p class="legal-text">
+            By creating an account, you represent and warrant that you
+            meet the eligibility requirements above and that your use of
+            AdvisorNest complies with all applicable laws and regulations,
+            including FINRA Rule 2111 (Suitability) and SEC Regulation
+            Best Interest.
+        </p>
+    </div>
+
+    <div class="legal-section">
+        <div class="legal-section-title">4. Not Financial Advice</div>
+        <p class="legal-text">
+            AdvisorNest is a decision support tool only.
+            <strong>AdvisorNest does not provide financial advice.</strong>
+            All portfolio recommendations, instrument suggestions, and
+            suitability notes generated by AdvisorNest are intended solely
+            as starting points for advisor review.
+        </p>
+        <p class="legal-text">
+            The licensed financial advisor using AdvisorNest is solely
+            responsible for:
+        </p>
+        <ul class="legal-list">
+            <li>Reviewing all AI-generated recommendations before presenting to clients</li>
+            <li>Determining the suitability of any recommendation for a specific client</li>
+            <li>Complying with all applicable fiduciary and suitability obligations</li>
+            <li>Making the final investment decision for each client</li>
+            <li>Maintaining appropriate regulatory compliance documentation</li>
+        </ul>
+    </div>
+
+    <div class="legal-section">
+        <div class="legal-section-title">5. User Accounts</div>
+        <p class="legal-text">
+            You are responsible for maintaining the confidentiality of
+            your account credentials. You agree to notify AdvisorNest
+            immediately of any unauthorized use of your account.
+            AdvisorNest is not liable for any loss resulting from
+            unauthorized use of your account.
+        </p>
+        <p class="legal-text">
+            You may not share your account with other individuals or
+            use your account to access AdvisorNest on behalf of a
+            third party without prior written authorization.
+        </p>
+    </div>
+
+    <div class="legal-section">
+        <div class="legal-section-title">6. Data and Privacy</div>
+        <p class="legal-text">
+            Client data you enter into AdvisorNest is used solely to
+            generate portfolio recommendations and documentation within
+            the Service. AdvisorNest does not sell client data to third
+            parties. Please review our
+            <a href="{{ url_for('main.privacy') }}"
+               style="color:var(--navy);font-weight:600">
+                Privacy Policy
+            </a>
+            for full details on how data is collected, used, and protected.
+        </p>
+    </div>
+
+    <div class="legal-section">
+        <div class="legal-section-title">7. Acceptable Use</div>
+        <p class="legal-text">You agree not to use AdvisorNest to:</p>
+        <ul class="legal-list">
+            <li>Generate recommendations for clients without appropriate licensing</li>
+            <li>Circumvent regulatory requirements or fiduciary obligations</li>
+            <li>Reverse engineer, copy, or redistribute any part of the Service</li>
+            <li>Upload false, misleading, or fraudulent client information</li>
+            <li>Use the Service for any unlawful purpose</li>
+        </ul>
+    </div>
+
+    <div class="legal-section">
+        <div class="legal-section-title">8. Intellectual Property</div>
+        <p class="legal-text">
+            AdvisorNest and all associated content, features, and
+            functionality are owned by AdvisorNest and protected by
+            applicable intellectual property laws. You may not copy,
+            reproduce, distribute, or create derivative works from any
+            part of the Service without prior written consent.
+        </p>
+    </div>
+
+    <div class="legal-section">
+        <div class="legal-section-title">9. Limitation of Liability</div>
+        <p class="legal-text">
+            To the maximum extent permitted by law, AdvisorNest shall
+            not be liable for any indirect, incidental, special,
+            consequential, or punitive damages arising from your use
+            of the Service or any recommendations generated by the Service.
+        </p>
+        <p class="legal-text">
+            AdvisorNest's total liability for any claim arising from
+            use of the Service shall not exceed the amount you paid
+            for the Service in the three months preceding the claim.
+        </p>
+    </div>
+
+    <div class="legal-section">
+        <div class="legal-section-title">10. Modifications to Terms</div>
+        <p class="legal-text">
+            AdvisorNest reserves the right to modify these Terms of
+            Service at any time. We will notify registered users of
+            material changes via email. Continued use of the Service
+            after notification constitutes acceptance of the updated terms.
+        </p>
+    </div>
+
+    <div class="legal-section">
+        <div class="legal-section-title">11. Governing Law</div>
+        <p class="legal-text">
+            These Terms of Service are governed by the laws of the
+            State of California, United States, without regard to
+            conflict of law provisions. Any disputes shall be resolved
+            in the courts of San Francisco County, California.
+        </p>
+    </div>
+
+    <div class="legal-section">
+        <div class="legal-section-title">12. Termination</div>
+        <p class="legal-text">
+            AdvisorNest may terminate or suspend your account at any
+            time for violation of these Terms. You may terminate your
+            account at any time by contacting us. Upon termination,
+            your right to use the Service ceases immediately.
+        </p>
+    </div>
+
+    <div class="legal-contact">
+        <div style="font-family:var(--font-heading);font-size:1rem;
+                    color:var(--navy);margin-bottom:8px">
+            Questions About These Terms?
+        </div>
+        <p class="legal-text" style="margin-bottom:0">
+            If you have questions about these Terms of Service,
+            please contact us at
+            <a href="mailto:legal@advisornest.com"
+               style="color:var(--navy);font-weight:600">
+                legal@advisornest.com
+            </a>
+        </p>
+    </div>
+
+</div>
+{% endblock %}

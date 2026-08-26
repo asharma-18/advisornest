@@ -866,3 +866,13 @@ def generate_suitability_note_route():
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)})
 
+# ── Terms of Service ──────────────────────────────────────
+@main.route("/terms")
+def terms():
+    return render_template("legal/terms.html")
+
+
+# ── Privacy Policy ────────────────────────────────────────
+@main.route("/privacy")
+def privacy():
+    return render_template("legal/privacy.html")

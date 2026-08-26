@@ -514,6 +514,15 @@
                 <button type="submit" class="auth-btn">
                     Log In to AdvisorNest
                 </button>
+                <div style="text-align:center;margin-top:20px;
+                            font-size:0.75rem;color:var(--text-muted)">
+                    By signing in you agree to our
+                    <a href="{{ url_for('main.terms') }}"
+                       style="color:var(--navy)">Terms of Service</a>
+                    and
+                    <a href="{{ url_for('main.privacy') }}"
+                       style="color:var(--navy)">Privacy Policy</a>
+                </div>
             <div style="display:flex;align-items:center;
                             gap:12px;margin:20px 0">
                     <div style="flex:1;height:1px;

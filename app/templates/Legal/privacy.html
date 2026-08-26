@@ -1,0 +1,349 @@
+{% extends "base.html" %}
+
+{% block title %}Privacy Policy — AdvisorNest{% endblock %}
+
+{% block extra_css %}
+<style>
+    .legal-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 48px 24px;
+    }
+
+    .legal-header {
+        margin-bottom: 40px;
+        padding-bottom: 24px;
+        border-bottom: 2px solid var(--accent);
+    }
+
+    .legal-title {
+        font-family: var(--font-heading);
+        font-size: 2rem;
+        color: var(--navy);
+        margin-bottom: 8px;
+    }
+
+    .legal-date {
+        font-size: 0.875rem;
+        color: var(--text-muted);
+    }
+
+    .legal-section {
+        margin-bottom: 32px;
+    }
+
+    .legal-section-title {
+        font-family: var(--font-heading);
+        font-size: 1.1rem;
+        color: var(--navy);
+        margin-bottom: 12px;
+        padding-bottom: 6px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .legal-text {
+        font-size: 0.9rem;
+        color: var(--text-secondary);
+        line-height: 1.8;
+        margin-bottom: 12px;
+    }
+
+    .legal-list {
+        list-style: none;
+        margin: 12px 0;
+    }
+
+    .legal-list li {
+        font-size: 0.9rem;
+        color: var(--text-secondary);
+        line-height: 1.8;
+        padding: 4px 0 4px 20px;
+        position: relative;
+    }
+
+    .legal-list li::before {
+        content: '•';
+        color: var(--accent);
+        position: absolute;
+        left: 0;
+        font-weight: 700;
+    }
+
+    .legal-highlight {
+        background: var(--info-bg);
+        border: 1px solid #bee3f8;
+        border-left: 3px solid var(--navy);
+        border-radius: 6px;
+        padding: 14px 18px;
+        margin-bottom: 24px;
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+        line-height: 1.7;
+    }
+
+    .legal-contact {
+        background: var(--bg-primary);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 20px 24px;
+        margin-top: 32px;
+    }
+
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 16px 0;
+        font-size: 0.875rem;
+    }
+
+    .data-table th {
+        background: var(--navy);
+        color: white;
+        padding: 10px 14px;
+        text-align: left;
+        font-weight: 600;
+    }
+
+    .data-table td {
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--border);
+        color: var(--text-secondary);
+        vertical-align: top;
+    }
+
+    .data-table tr:nth-child(even) td {
+        background: var(--bg-primary);
+    }
+</style>
+{% endblock %}
+
+{% block auth_content %}
+<div class="legal-container">
+
+    <div class="legal-header">
+        <div class="legal-title">Privacy Policy</div>
+        <div class="legal-date">
+            Last updated: August 2026 &nbsp;·&nbsp;
+            Effective: August 2026
+        </div>
+    </div>
+
+    <div class="legal-highlight">
+        AdvisorNest is committed to protecting the privacy of financial
+        advisors and their clients. This policy explains what data we
+        collect, how we use it, and your rights regarding your data.
+        We do not sell personal data to third parties.
+    </div>
+
+    <div class="legal-section">
+        <div class="legal-section-title">1. Who We Are</div>
+        <p class="legal-text">
+            AdvisorNest is a software-as-a-service platform providing
+            AI-powered portfolio recommendation tools for licensed
+            financial advisors. References to "AdvisorNest", "we",
+            "us", or "our" in this policy refer to AdvisorNest and
+            its operators.
+        </p>
+    </div>
+
+    <div class="legal-section">
+        <div class="legal-section-title">2. Data We Collect</div>
+        <p class="legal-text">
+            We collect the following categories of data:
+        </p>
+
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>Examples</th>
+                    <th>Purpose</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Advisor Account Data</strong></td>
+                    <td>Name, email, firm name, CRD number</td>
+                    <td>Account creation and PDF reports</td>
+                </tr>
+                <tr>
+                    <td><strong>Client Profile Data</strong></td>
+                    <td>Client name, age, risk tolerance, investment amount</td>
+                    <td>Generating portfolio recommendations</td>
+                </tr>
+                <tr>
+                    <td><strong>Usage Data</strong></td>
+                    <td>Login times, features used, recommendations generated</td>
+                    <td>Service improvement and security</td>
+                </tr>
+                <tr>
+                    <td><strong>AI Interaction Data</strong></td>
+                    <td>Prompts sent to AI, recommendations generated</td>
+                    <td>Generating recommendations, audit trail</td>
+                </tr>
+                <tr>
+                    <td><strong>Meeting Notes</strong></td>
+                    <td>Advisor-entered notes about client meetings</td>
+                    <td>Practice management</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="legal-section">
+        <div class="legal-section-title">3. How We Use Your Data</div>
+        <p class="legal-text">
+            We use the data we collect to:
+        </p>
+        <ul class="legal-list">
+            <li>Provide and operate the AdvisorNest platform</li>
+            <li>Generate AI-powered portfolio recommendations</li>
+            <li>Create and store client profiles and recommendations</li>
+            <li>Generate PDF reports for advisor use</li>
+            <li>Authenticate your account and maintain security</li>
+            <li>Send transactional emails (account verification, password reset)</li>
+            <li>Improve the Service based on usage patterns</li>
+            <li>Comply with legal and regulatory requirements</li>
+        </ul>
+    </div>
+
+    <div class="legal-section">
+        <div class="legal-section-title">4. AI and Third Party Services</div>
+        <p class="legal-text">
+            AdvisorNest uses the following third-party services to
+            operate the platform:
+        </p>
+        <ul class="legal-list">
+            <li>
+                <strong>OpenAI</strong> — Portfolio recommendations and
+                suitability notes are generated using OpenAI's GPT models.
+                Client profile data is sent to OpenAI's API to generate
+                recommendations. OpenAI's privacy policy applies to
+                this data processing.
+            </li>
+            <li>
+                <strong>Supabase</strong> — We use Supabase to store
+                advisor accounts, client profiles, and recommendations.
+                Data is stored in secure, encrypted databases.
+            </li>
+            <li>
+                <strong>FRED (Federal Reserve)</strong> — We fetch
+                publicly available market data including Treasury yields
+                and interest rates. No personal data is shared with FRED.
+            </li>
+        </ul>
+        <p class="legal-text">
+            We do not share personal data with any third party for
+            marketing or advertising purposes.
+        </p>
+    </div>
+
+    <div class="legal-section">
+        <div class="legal-section-title">5. Client Data</div>
+        <p class="legal-text">
+            As a financial advisor using AdvisorNest, you are the data
+            controller for your clients' personal information. You are
+            responsible for:
+        </p>
+        <ul class="legal-list">
+            <li>Obtaining appropriate consent from clients before entering their data</li>
+            <li>Complying with applicable privacy laws regarding client data</li>
+            <li>Maintaining appropriate data security practices</li>
+            <li>Notifying clients if their data is processed by AI systems</li>
+        </ul>
+        <p class="legal-text">
+            AdvisorNest acts as a data processor for client personal
+            information entered by advisors. We process this data only
+            as instructed by advisors through use of the Service.
+        </p>
+    </div>
+
+    <div class="legal-section">
+        <div class="legal-section-title">6. Data Security</div>
+        <p class="legal-text">
+            We implement industry-standard security measures to protect
+            your data including:
+        </p>
+        <ul class="legal-list">
+            <li>Encryption of data in transit using TLS/HTTPS</li>
+            <li>Encryption of data at rest in our database</li>
+            <li>Row-level security ensuring advisors can only access their own data</li>
+            <li>Secure authentication via Supabase Auth</li>
+            <li>Regular security reviews and updates</li>
+        </ul>
+    </div>
+
+    <div class="legal-section">
+        <div class="legal-section-title">7. Data Retention</div>
+        <p class="legal-text">
+            We retain your data for as long as your account is active.
+            If you close your account, we will delete your personal data
+            within 30 days, except where we are required to retain it
+            for legal or regulatory compliance purposes.
+        </p>
+        <p class="legal-text">
+            Recommendation and client data may be retained for up to
+            7 years to support regulatory compliance and audit requirements
+            applicable to financial advisory businesses.
+        </p>
+    </div>
+
+    <div class="legal-section">
+        <div class="legal-section-title">8. Your Rights</div>
+        <p class="legal-text">
+            Depending on your location, you may have the following
+            rights regarding your personal data:
+        </p>
+        <ul class="legal-list">
+            <li><strong>Access</strong> — Request a copy of the data we hold about you</li>
+            <li><strong>Correction</strong> — Request correction of inaccurate data</li>
+            <li><strong>Deletion</strong> — Request deletion of your personal data</li>
+            <li><strong>Portability</strong> — Request your data in a portable format</li>
+            <li><strong>Objection</strong> — Object to certain processing of your data</li>
+        </ul>
+        <p class="legal-text">
+            To exercise any of these rights, contact us at
+            <a href="mailto:privacy@advisornest.com"
+               style="color:var(--navy);font-weight:600">
+                privacy@advisornest.com
+            </a>
+        </p>
+    </div>
+
+    <div class="legal-section">
+        <div class="legal-section-title">9. Cookies</div>
+        <p class="legal-text">
+            AdvisorNest uses session cookies to maintain your login
+            state. We do not use tracking cookies, advertising cookies,
+            or third-party analytics cookies. You can disable cookies
+            in your browser settings, but this may prevent you from
+            logging in to the Service.
+        </p>
+    </div>
+
+    <div class="legal-section">
+        <div class="legal-section-title">10. Changes to This Policy</div>
+        <p class="legal-text">
+            We may update this Privacy Policy from time to time. We
+            will notify you of material changes via email or a prominent
+            notice on the Service. Your continued use of AdvisorNest
+            after notification constitutes acceptance of the updated policy.
+        </p>
+    </div>
+
+    <div class="legal-contact">
+        <div style="font-family:var(--font-heading);font-size:1rem;
+                    color:var(--navy);margin-bottom:8px">
+            Privacy Questions or Concerns?
+        </div>
+        <p class="legal-text" style="margin-bottom:0">
+            Contact our privacy team at
+            <a href="mailto:privacy@advisornest.com"
+               style="color:var(--navy);font-weight:600">
+                privacy@advisornest.com
+            </a>
+        </p>
+    </div>
+
+</div>
+{% endblock %}

@@ -715,6 +715,15 @@
                 <button type="submit" class="auth-btn">
                     Create My AdvisorNest Account
                 </button>
+            <div style="text-align:center;margin-top:20px;
+                     font-size:0.75rem;color:var(--text-muted)">
+                 By registering you agree to our
+                <a href="{{ url_for('main.terms') }}"
+                   style="color:var(--navy)">Terms of Service</a>
+                and
+                <a href="{{ url_for('main.privacy') }}"
+                   style="color:var(--navy)">Privacy Policy</a>
+            </div>
 
             </form>
 

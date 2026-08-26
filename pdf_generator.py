@@ -410,7 +410,7 @@ def generate_pdf_report(client, advisor):
         "decision support software for licensed financial advisors only. "
         "All recommendations require advisor review and client suitability "
         "assessment before implementation. This document does not constitute "
-        "financial advice. AdvisorNest 2025",
+        "financial advice. AdvisorNest 2026",
         s_disclaimer))
 
     doc.build(content)
