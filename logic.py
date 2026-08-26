@@ -115,45 +115,70 @@ def get_advisor_flags(risk, horizon, age):
 def generate_suitability_note(client_name, age, life_stage,
                                risk, horizon, amount, allocation):
     """
-    Generates an auto-written suitability note documenting
-    why this recommendation is appropriate for this client.
-    This is what advisors need for compliance documentation.
+    Generates a professional suitability assessment note
+    for compliance documentation.
     """
-    risk_description = {
-        "high":   "aggressive growth",
-        "medium": "balanced growth and income",
-        "low":    "capital preservation and income"
-    }.get(risk.lower(), "balanced")
 
-    largest = max(allocation, key=allocation.get)
-    largest_pct = allocation[largest]
+    # Determine primary allocation category
+    if isinstance(allocation, dict):
+        primary = max(allocation, key=allocation.get)
+        primary_pct = allocation.get(primary, 0)
+    else:
+        primary = "balanced"
+        primary_pct = 0
+
+    # Map category keys to readable names
+    category_names = {
+        "equity_etfs":   "Equity ETFs",
+        "growth_stocks": "Growth Stocks",
+        "bond_etfs":     "Bond ETFs",
+        "mutual_funds":  "Mutual Funds",
+        "cds":           "Certificates of Deposit",
+        "stocks_lt":     "Long-Term Equities",
+        "stocks_st":     "Short-Term Equities",
+        "bonds":         "Bonds",
+    }
+
+    primary_name = category_names.get(primary, primary.replace("_", " ").title())
+
+    # Risk rationale
+    risk_rationale = {
+        "Low":    "The client has expressed a low risk tolerance, prioritizing capital preservation over growth. The recommended allocation reflects this preference with a conservative weighting toward fixed income and guaranteed instruments.",
+        "Medium": "The client has expressed a moderate risk tolerance, seeking a balance between growth and capital preservation. The recommended allocation reflects a balanced approach across equity and fixed income instruments.",
+        "High":   "The client has expressed a high risk tolerance, prioritizing long-term capital appreciation over short-term stability. The recommended allocation reflects this with a significant weighting toward equity instruments."
+    }
+
+    # Life stage rationale
+    life_stage_rationale = {
+        "Early Career":    "As an early-career investor, the client has a long investment horizon providing significant time for portfolio recovery from market downturns, supporting a higher equity allocation.",
+        "Mid-Career":      "As a mid-career investor, the client is in a wealth accumulation phase with sufficient time horizon to balance growth and income objectives.",
+        "Pre-Retirement":  "As a pre-retirement investor, capital preservation becomes increasingly important. The allocation reflects the need to protect accumulated wealth while maintaining measured growth.",
+        "Retirement":      "As a retired investor, income generation and capital preservation are the primary objectives. The allocation prioritizes stable, income-producing instruments."
+    }
 
     note = f"""SUITABILITY ASSESSMENT NOTE
 
 Client: {client_name}
 Age: {age} | Life Stage: {life_stage}
 Investment Amount: ${amount:,}
-Risk Tolerance: {risk.title()}
+Risk Tolerance: {risk}
 Time Horizon: {horizon} years
 
-RECOMMENDATION RATIONALE:
-Based on the client profile above, this portfolio allocation 
-has been designed to achieve {risk_description} objectives. 
+SUITABILITY DETERMINATION:
+This portfolio recommendation has been determined suitable for the above-named client based on the following factors:
 
-The recommended allocation places the largest weighting 
-({largest_pct}%) in {largest}, which is appropriate given 
-the client's {risk.lower()} risk tolerance and {horizon}-year 
-investment horizon.
+1. RISK PROFILE ALIGNMENT
+{risk_rationale.get(risk, "The allocation has been designed to align with the client's stated risk tolerance.")}
 
-{"Given the client's age of " + str(age) + ", the allocation has been adjusted toward more conservative instruments to prioritize capital preservation." if age > 55 else ""}
-{"The short time horizon of " + str(horizon) + " years has been reflected in reduced equity exposure to ensure adequate liquidity." if horizon < 5 else ""}
+2. TIME HORIZON CONSIDERATION
+{life_stage_rationale.get(life_stage, "The allocation reflects the client's investment time horizon.")} With a {horizon}-year investment horizon, the recommended portfolio is designed to meet the client's long-term financial objectives.
 
-This recommendation was generated using AdvisorNest as a 
-decision support tool. The final recommendation has been 
-reviewed and approved by the licensed financial advisor.
+3. ALLOCATION RATIONALE
+The recommended allocation places the largest weighting ({primary_pct}%) in {primary_name}. This reflects the client's risk profile, time horizon, and current market conditions at the time of recommendation generation.
 
-⚖ This document was prepared using AdvisorNest decision 
-support software. All recommendations require advisor review 
-and client suitability assessment before implementation.
-"""
+4. ADVISOR REVIEW AND APPROVAL
+This recommendation has been reviewed by the licensed financial advisor named above. The advisor has determined that this recommendation is suitable for the client based on their complete financial picture, including factors not captured in this automated analysis such as existing assets, liabilities, tax situation, insurance coverage, and estate planning considerations.
+
+5. DECISION SUPPORT DISCLOSURE
+This recommendation was generated using AdvisorNest as a decision support tool for licensed financial advisors. The final investment decision rests solely with the licensed advisor. AdvisorNest does not provide financial advice and is not a registered investment advisor."""
     return note

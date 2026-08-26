@@ -4,11 +4,12 @@ from reportlab.lib.colors import HexColor, white
 from reportlab.lib.units import inch
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer,
-    Table, TableStyle, HRFlowable
+    Table, TableStyle, HRFlowable, KeepTogether
 )
 from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
 from io import BytesIO
 from datetime import datetime
+import json
 
 NAVY     = HexColor("#2c4a6e")
 GOLD     = HexColor("#d4a853")
@@ -70,33 +71,33 @@ def generate_pdf_report(client, advisor):
     )
     header.setStyle(TableStyle([
         ("BACKGROUND",    (0,0), (-1,-1), NAVY),
-        ("LEFTPADDING",   (0,0), (-1,-1), 16),
-        ("RIGHTPADDING",  (0,0), (-1,-1), 16),
-        ("TOPPADDING",    (0,0), (-1,0),  14),
+        ("LEFTPADDING",   (0,0), (-1,-1), 12),
+        ("RIGHTPADDING",  (0,0), (-1,-1), 12),
+        ("TOPPADDING",    (0,0), (-1,0),  8),
         ("BOTTOMPADDING", (0,0), (-1,0),  2),
         ("TOPPADDING",    (0,1), (-1,1),  2),
-        ("BOTTOMPADDING", (0,1), (-1,1),  12),
+        ("BOTTOMPADDING", (0,1), (-1,1),  6),
         ("VALIGN",        (0,0), (-1,-1), "MIDDLE"),
     ]))
     content.append(header)
-    content.append(Spacer(1, 14))
+    content.append(Spacer(1, 8))
 
-    # ── 2. Title ──────────────────────────────────────────
-    content.append(Spacer(1, 6))
+    # ── 2. Title ───────────────────────────────────────────
+    content.append(Spacer(1, 3))
     content.append(Paragraph(
         f"Prepared for <b>{client['client_name']}</b>",
         ParagraphStyle("Sub1", fontSize=14, textColor=NAVY,
             fontName="Times-Bold", alignment=TA_CENTER, spaceAfter=4)))
     content.append(Paragraph(
         f"{advisor.get('full_name', 'Licensed Advisor')} "
-        f"&nbsp;·&nbsp; "
+        f"&nbsp;&middot;&nbsp; "
         f"{advisor.get('firm_name', 'Independent')}",
         ParagraphStyle("Sub2", fontSize=10, textColor=MUTED,
             fontName="Helvetica", alignment=TA_CENTER, spaceAfter=14)))
     content.append(HRFlowable(width="100%", thickness=1.5,
-        color=GOLD, spaceAfter=14))
+        color=GOLD, spaceAfter=8))
 
-    # ── Helper ────────────────────────────────────────────
+    # ── Helper ─────────────────────────────────────────────
     def section_bar(title):
         t = Table([[Paragraph(title, s_section)]], colWidths=[W])
         t.setStyle(TableStyle([
@@ -108,7 +109,7 @@ def generate_pdf_report(client, advisor):
         ]))
         return t
 
-    # ── 3. Client Profile ─────────────────────────────────
+    # ── 3. Client Profile ──────────────────────────────────
     content.append(section_bar("CLIENT PROFILE"))
     content.append(Spacer(1, 6))
 
@@ -142,17 +143,37 @@ def generate_pdf_report(client, advisor):
     content.append(pt)
     content.append(Spacer(1, 14))
 
-    # ── 4. Portfolio Allocation ───────────────────────────
+    # ── 4. Portfolio Allocation ────────────────────────────
     content.append(section_bar("PORTFOLIO ALLOCATION"))
     content.append(Spacer(1, 6))
 
     allocation = client.get("allocation", {})
+    if isinstance(allocation, str):
+        try:
+            allocation = json.loads(allocation)
+        except Exception:
+            allocation = {}
+
+    cat_labels = {
+        "equity_etfs":   "Equity ETFs",
+        "growth_stocks": "Growth Stocks",
+        "bond_etfs":     "Bond ETFs",
+        "mutual_funds":  "Mutual Funds",
+        "cds":           "Certificates of Deposit",
+        "stocks_lt":     "Long-Term Stocks",
+        "stocks_st":     "Short-Term Stocks",
+        "bonds":         "Bonds",
+    }
+
     notes_map = {
-        "Stocks (Long Term)":  "Growth equity for long-term appreciation",
-        "Stocks (Short Term)": "Tactical equity for near-term opportunities",
-        "Bonds":               "Fixed income for stability and income",
-        "Mutual Funds":        "Diversified professionally managed funds",
-        "CDs":                 "FDIC-insured certificates of deposit",
+        "equity_etfs":   "Diversified ETF exposure to equity markets",
+        "growth_stocks": "Individual company stocks for capital appreciation",
+        "bond_etfs":     "Fixed income ETFs for stability and income",
+        "mutual_funds":  "Professionally managed diversified funds",
+        "cds":           "FDIC-insured certificates of deposit",
+        "stocks_lt":     "Growth equity for long-term appreciation",
+        "stocks_st":     "Tactical equity for near-term opportunities",
+        "bonds":         "Fixed income for stability and income",
     }
 
     alloc_data = [[
@@ -168,18 +189,21 @@ def generate_pdf_report(client, advisor):
             textColor=WHITE, fontName="Helvetica-Bold")),
     ]]
 
-    for instrument, pct in allocation.items():
-        dollar = round((pct / 100) * client["amount"])
-        alloc_data.append([
-            Paragraph(instrument, s_bold),
-            Paragraph(f"{pct}%", ParagraphStyle("AP", fontSize=9,
-                textColor=NAVY, fontName="Helvetica-Bold",
-                alignment=TA_CENTER)),
-            Paragraph(f"${dollar:,}", ParagraphStyle("AR", fontSize=9,
-                textColor=TEXT, fontName="Helvetica-Bold",
-                alignment=TA_RIGHT)),
-            Paragraph(notes_map.get(instrument, ""), s_label),
-        ])
+    for key, pct in allocation.items():
+        if pct > 0:
+            dollar = round((pct / 100) * client["amount"])
+            label = cat_labels.get(key, key.replace("_", " ").title())
+            note  = notes_map.get(key, "")
+            alloc_data.append([
+                Paragraph(label, s_bold),
+                Paragraph(f"{pct}%", ParagraphStyle("AP", fontSize=9,
+                    textColor=NAVY, fontName="Helvetica-Bold",
+                    alignment=TA_CENTER)),
+                Paragraph(f"${dollar:,}", ParagraphStyle("AR", fontSize=9,
+                    textColor=TEXT, fontName="Helvetica-Bold",
+                    alignment=TA_RIGHT)),
+                Paragraph(note, s_label),
+            ])
 
     alloc_data.append([
         Paragraph("TOTAL", ParagraphStyle("AT1", fontSize=9,
@@ -207,7 +231,124 @@ def generate_pdf_report(client, advisor):
     content.append(at)
     content.append(Spacer(1, 14))
 
-    # ── 5. Suitability Note ───────────────────────────────
+    # ── 5. Recommended Instruments ─────────────────────────
+    rec_data = client.get("recommendation_data", {}) or {}
+    if isinstance(rec_data, str):
+        try:
+            rec_data = json.loads(rec_data)
+        except Exception:
+            rec_data = {}
+
+    instruments = rec_data.get("instruments", {})
+
+    if instruments:
+        content.append(section_bar("RECOMMENDED INSTRUMENTS"))
+        content.append(Spacer(1, 6))
+
+        instr_cat_colors = {
+            "equity_etfs":   HexColor("#2c4a6e"),
+            "growth_stocks": HexColor("#b7791f"),
+            "bond_etfs":     HexColor("#2d7d4f"),
+            "mutual_funds":  HexColor("#553c9a"),
+            "cds":           HexColor("#9b2c2c"),
+        }
+
+        instr_cat_labels = {
+            "equity_etfs":   "EQUITY ETFs",
+            "growth_stocks": "GROWTH STOCKS",
+            "bond_etfs":     "BOND ETFs",
+            "mutual_funds":  "MUTUAL FUNDS",
+            "cds":           "CERTIFICATES OF DEPOSIT",
+        }
+
+        tab_order = [
+            "equity_etfs", "growth_stocks",
+            "bond_etfs", "mutual_funds", "cds"
+        ]
+
+        for cat_key in tab_order:
+            cat_instr = instruments.get(cat_key, [])
+            if not cat_instr:
+                continue
+
+            cat_color = instr_cat_colors.get(cat_key, NAVY)
+            cat_name  = instr_cat_labels.get(cat_key, cat_key.upper())
+
+            # Category sub-header
+            sub_hdr = Table(
+                [[Paragraph(cat_name, ParagraphStyle(
+                    "CatHdr", fontSize=8, textColor=WHITE,
+                    fontName="Helvetica-Bold", leading=11))]],
+                colWidths=[W]
+            )
+            sub_hdr.setStyle(TableStyle([
+                ("BACKGROUND",    (0,0), (-1,-1), cat_color),
+                ("TOPPADDING",    (0,0), (-1,-1), 5),
+                ("BOTTOMPADDING", (0,0), (-1,-1), 5),
+                ("LEFTPADDING",   (0,0), (-1,-1), 10),
+                ("RIGHTPADDING",  (0,0), (-1,-1), 10),
+            ]))
+            content.append(sub_hdr)
+
+            # Instrument rows
+            instr_rows = [[
+                Paragraph("Ticker", ParagraphStyle("IH1", fontSize=8,
+                    textColor=WHITE, fontName="Helvetica-Bold")),
+                Paragraph("Instrument Name", ParagraphStyle("IH2", fontSize=8,
+                    textColor=WHITE, fontName="Helvetica-Bold")),
+                Paragraph("Alloc %", ParagraphStyle("IH3", fontSize=8,
+                    textColor=WHITE, fontName="Helvetica-Bold",
+                    alignment=TA_CENTER)),
+                Paragraph("Amount", ParagraphStyle("IH4", fontSize=8,
+                    textColor=WHITE, fontName="Helvetica-Bold",
+                    alignment=TA_RIGHT)),
+                Paragraph("Hold Period", ParagraphStyle("IH5", fontSize=8,
+                    textColor=WHITE, fontName="Helvetica-Bold")),
+            ]]
+
+            for inst in cat_instr:
+                pct    = inst.get("allocation_pct", 0)
+                dollar = inst.get("dollar_amount", 0) or (pct/100)*client["amount"]
+                instr_rows.append([
+                    Paragraph(inst.get("ticker", ""), s_bold),
+                    Paragraph(inst.get("name", ""), s_body),
+                    Paragraph(f"{pct}%", ParagraphStyle("IP", fontSize=9,
+                        textColor=NAVY, fontName="Helvetica-Bold",
+                        alignment=TA_CENTER)),
+                    Paragraph(f"${dollar:,.0f}", ParagraphStyle("IA", fontSize=9,
+                        textColor=TEXT, fontName="Helvetica-Bold",
+                        alignment=TA_RIGHT)),
+                    Paragraph(inst.get("hold_period", ""), s_label),
+                ])
+
+            it = Table(instr_rows,
+                colWidths=[0.7*inch, 2.2*inch, 0.65*inch, 0.95*inch, 2.4*inch])
+            it.setStyle(TableStyle([
+                ("BACKGROUND",    (0,0),  (-1,0),  cat_color),
+                ("ROWBACKGROUND", (0,1),  (-1,-1), [LIGHT_BG, WHITE]),
+                ("GRID",          (0,0),  (-1,-1), 0.5, BORDER),
+                ("PADDING",       (0,0),  (-1,-1), 6),
+                ("VALIGN",        (0,0),  (-1,-1), "MIDDLE"),
+                ("FONTNAME",      (0,1),  (0,-1),  "Helvetica-Bold"),
+                ("TEXTCOLOR",     (0,1),  (0,-1),  NAVY),
+            ]))
+            content.append(it)
+
+            # Reasoning lines
+            for inst in cat_instr:
+                if inst.get("reasoning"):
+                    content.append(Paragraph(
+                        f"<b>{inst.get('ticker')}</b>: {inst.get('reasoning')}",
+                        ParagraphStyle("Reason", fontSize=7.5, textColor=MUTED,
+                            fontName="Helvetica", leading=11,
+                            spaceAfter=2, leftIndent=6)
+                    ))
+
+            content.append(Spacer(1, 8))
+
+        content.append(Spacer(1, 6))
+
+    # ── 6. Suitability Note ────────────────────────────────
     content.append(section_bar("SUITABILITY ASSESSMENT"))
     content.append(Spacer(1, 6))
 
@@ -226,18 +367,18 @@ def generate_pdf_report(client, advisor):
 
     content.append(Spacer(1, 14))
 
-    # ── 6. Advisor Signature ──────────────────────────────
-    content.append(section_bar("ADVISOR CONFIRMATION"))
-    content.append(Spacer(1, 6))
-
+     # ── 7. Advisor Signature ───────────────────────────────
     sig = [
         [Paragraph("Advisor Name:", s_label),
          Paragraph(advisor.get("full_name", ""), s_bold),
          Paragraph("Firm:", s_label),
          Paragraph(advisor.get("firm_name", "Independent"), s_body)],
-        [Paragraph("Date:", s_label),
-         Paragraph("_______________________", s_body),
-         Paragraph("License #:", s_label),
+        [Paragraph("CRD #:", s_label),
+         Paragraph(
+             advisor.get("license_number", "_______________________"),
+             s_body
+         ),
+         Paragraph("Date:", s_label),
          Paragraph("_______________________", s_body)],
         [Paragraph("Signature:", s_label),
          Paragraph("_______________________", s_body),
@@ -253,10 +394,15 @@ def generate_pdf_report(client, advisor):
         ("PADDING",    (0,0), (-1,-1), 8),
         ("VALIGN",     (0,0), (-1,-1), "MIDDLE"),
     ]))
-    content.append(st)
-    content.append(Spacer(1, 18))
 
-    # ── 7. Footer ─────────────────────────────────────────
+    # Keep signature together with its header
+    content.append(KeepTogether([
+        section_bar("ADVISOR CONFIRMATION"),
+        Spacer(1, 6),
+        st,
+        Spacer(1, 18),
+    ]))
+    # ── 8. Footer ──────────────────────────────────────────
     content.append(HRFlowable(width="100%", thickness=1,
         color=GOLD, spaceAfter=6))
     content.append(Paragraph(

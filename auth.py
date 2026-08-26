@@ -27,11 +27,11 @@ def register_advisor(email, password, full_name, firm_name):
         user_id = auth_response.user.id
 
         supabase.table("advisors").insert({
-            "id": user_id,
-            "full_name": full_name,
-            "firm_name": firm_name
+            "id":             user_id,
+            "full_name":      full_name,
+            "firm_name":      firm_name,
+            "license_number": request.form.get("license_number", ""),
         }).execute()
-
         return {
             "success": True,
             "message": "Account created successfully!"

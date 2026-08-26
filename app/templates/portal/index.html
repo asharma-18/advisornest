@@ -62,22 +62,6 @@
 
     .risk-label:hover { border-color: var(--navy); color: var(--navy); }
 
-    .loading-bar-wrap {
-        margin-top: 12px;
-        height: 3px;
-        background: var(--border);
-        border-radius: 3px;
-        overflow: hidden;
-    }
-
-    .loading-bar-fill {
-        height: 100%;
-        width: 0%;
-        background: var(--navy);
-        border-radius: 3px;
-        transition: width 0.5s ease;
-    }
-
     .ai-options-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -234,8 +218,7 @@
 
     .instrument-ticker {
         font-size: 0.875rem; font-weight: 700;
-        color: var(--text-primary);
-        min-width: 60px;
+        color: var(--text-primary); min-width: 60px;
     }
 
     .instrument-details { flex: 1; }
@@ -570,6 +553,11 @@
         border: 1px dashed var(--border);
         border-radius: 8px;
     }
+
+    .suitability-loading {
+        color: var(--text-muted) !important;
+        font-style: italic !important;
+    }
 </style>
 {% endblock %}
 
@@ -817,6 +805,7 @@
             {% endfor %}
         </div>
 
+        <!-- Detail panels -->
         {% for option in result.ai_options %}
         <div id="detail-{{ option.id }}"
              class="option-detail"
@@ -879,21 +868,13 @@
                                     <div style="margin-top:6px">
                                         {% set hp = inst.hold_period %}
                                         {% if 'Tactical' in hp or 'tactical' in hp %}
-                                        <span class="hold-badge tactical">
-                                            ⚡ {{ hp }}
-                                        </span>
+                                        <span class="hold-badge tactical">⚡ {{ hp }}</span>
                                         {% elif 'Income' in hp or 'income' in hp %}
-                                        <span class="hold-badge income">
-                                            💰 {{ hp }}
-                                        </span>
+                                        <span class="hold-badge income">💰 {{ hp }}</span>
                                         {% elif 'Core' in hp or 'core' in hp %}
-                                        <span class="hold-badge core">
-                                            📌 {{ hp }}
-                                        </span>
+                                        <span class="hold-badge core">📌 {{ hp }}</span>
                                         {% else %}
-                                        <span class="hold-badge strategic">
-                                            📌 {{ hp }}
-                                        </span>
+                                        <span class="hold-badge strategic">📌 {{ hp }}</span>
                                         {% endif %}
                                     </div>
                                 </div>
@@ -920,6 +901,7 @@
             </div>
             {% endif %}
 
+            <!-- AI Reasoning -->
             <div class="reasoning-card">
                 <div class="reasoning-title">
                     🤖 AI Reasoning — {{ option.name }}
@@ -942,6 +924,7 @@
                 {% endif %}
             </div>
 
+            <!-- Flags -->
             {% if option.flags %}
             <div style="margin-bottom:16px">
                 {% for flag in option.flags %}
@@ -950,19 +933,31 @@
             </div>
             {% endif %}
 
+            <!-- Suitability Note -->
             <div class="reasoning-card">
                 <div class="reasoning-title">
                     📋 Suitability Assessment Note
+                    <span style="font-size:0.7rem;font-weight:400;
+                                 color:var(--text-muted);margin-left:8px">
+                        AI-generated compliance documentation
+                    </span>
                 </div>
-                <div style="font-size:0.8rem;color:var(--text-secondary);
+                <div id="suitability-note-{{ option.id }}"
+                     style="font-size:0.8rem;color:var(--text-secondary);
                             line-height:1.8;white-space:pre-wrap;
                             background:var(--bg-primary);
                             border:1px solid var(--border-light);
-                            border-radius:6px;padding:14px 16px">
-                    {{ result.suitability_note }}
+                            border-radius:6px;padding:14px 16px;
+                            min-height:80px">
+                    {% if loop.first %}
+                    ⏳ Generating compliance suitability note...
+                    {% else %}
+                    Click this option to generate suitability note.
+                    {% endif %}
                 </div>
             </div>
 
+            <!-- Customize Panel -->
             <div class="section-divider">Advisor Customization</div>
 
             <div style="margin-bottom:16px">
@@ -972,8 +967,7 @@
                 </button>
             </div>
 
-            <div class="customize-panel"
-                 id="customize-{{ option.id }}">
+            <div class="customize-panel" id="customize-{{ option.id }}">
                 <div class="customize-title">
                     Customize Option {{ option.id }} — {{ option.name }}
                 </div>
@@ -1084,15 +1078,9 @@
                             {% for inst in instruments %}
                             <div class="instr-row"
                                  id="instr-{{ option.id }}-{{ key }}-{{ loop.index0 }}">
-                                <div class="instr-row-ticker">
-                                    {{ inst.ticker }}
-                                </div>
-                                <div class="instr-row-name">
-                                    {{ inst.name }}
-                                </div>
-                                <div class="instr-row-pct">
-                                    {{ inst.allocation_pct }}%
-                                </div>
+                                <div class="instr-row-ticker">{{ inst.ticker }}</div>
+                                <div class="instr-row-name">{{ inst.name }}</div>
+                                <div class="instr-row-pct">{{ inst.allocation_pct }}%</div>
                                 <button class="instr-remove-btn"
                                         onclick="removeInstrument(
                                             'instr-{{ option.id }}-{{ key }}-{{ loop.index0 }}')">
@@ -1115,16 +1103,14 @@
                                placeholder="Ticker (e.g. VOO)"
                                maxlength="10"
                                oninput="validateTicker(this,
-                                        '{{ option.id }}',
-                                        '{{ key }}')">
+                                        '{{ option.id }}', '{{ key }}')">
                         <input type="number"
                                class="add-instr-pct"
                                id="addpct-{{ option.id }}-{{ key }}"
                                placeholder="%" min="1" max="100">
                         <button class="add-instr-btn"
                                 onclick="addInstrument(
-                                    '{{ option.id }}',
-                                    '{{ key }}')">
+                                    '{{ option.id }}', '{{ key }}')">
                             + Add
                         </button>
                     </div>
@@ -1150,6 +1136,7 @@
                 </div>
             </div>
 
+            <!-- Actions -->
             <div class="actions-bar">
                 <button type="button" class="btn btn-primary"
                         onclick="saveClient('{{ option.id }}',
@@ -1196,8 +1183,7 @@
                 box-shadow:0 24px 64px rgba(0,0,0,0.3)">
         <div style="font-size:3rem;margin-bottom:16px">🤖</div>
         <div style="font-family:var(--font-heading);
-                    font-size:1.3rem;
-                    color:var(--text-primary);
+                    font-size:1.3rem;color:var(--text-primary);
                     margin-bottom:8px"
              id="loading-msg">
             Analyzing client profile...
@@ -1208,13 +1194,10 @@
             Age, risk, horizon, life stage
         </div>
         <div style="height:4px;background:var(--border);
-                    border-radius:4px;overflow:hidden;
-                    margin-bottom:20px">
+                    border-radius:4px;overflow:hidden;margin-bottom:20px">
             <div id="loading-bar"
-                 style="height:100%;width:0%;
-                        background:var(--navy);
-                        border-radius:4px;
-                        transition:width 0.6s ease">
+                 style="height:100%;width:0%;background:var(--navy);
+                        border-radius:4px;transition:width 0.6s ease">
             </div>
         </div>
         <div style="font-size:0.75rem;color:var(--text-muted)">
@@ -1239,8 +1222,7 @@
            value="{{ result.score if result else 0 }}">
     <input type="hidden" name="flags"            id="save-flags"
            value="{{ result.flags|tojson|forceescape if result else '[]' }}">
-    <input type="hidden" name="suitability_note" id="save-suitability"
-           value="{{ result.suitability_note|forceescape if result else '' }}">
+    <input type="hidden" name="suitability_note" id="save-suitability" value="">
     <input type="hidden" name="selected_option"  id="save-selected_option">
     <input type="hidden" name="ai_data"          id="save-ai_data" value="">
 </form>
@@ -1264,6 +1246,17 @@ window.AI_OPTIONS = {{ result.ai_options | tojson }};
 window.AI_MARKET_CONTEXT = {{ result.ai_data.market_context | tojson if result.ai_data and result.ai_data.market_context else '""' }};
 
 window.AI_ADVISOR_NOTE = {{ result.ai_data.advisor_note | tojson if result.ai_data and result.ai_data.advisor_note else '""' }};
+
+window.AI_MARKET_DATA = {{ result.market_data | tojson if result.market_data else '{}' }};
+
+window.CLIENT_PROFILE = {
+    client_name: {{ result.client_name | tojson }},
+    age:         {{ result.age }},
+    life_stage:  {{ result.life_stage | tojson }},
+    risk:        {{ result.risk | tojson }},
+    horizon:     {{ result.horizon }},
+    amount:      {{ result.amount }}
+};
 </script>
 {% endif %}
 
@@ -1335,7 +1328,73 @@ function selectOption(optionId) {
     });
     const detail = document.getElementById('detail-' + optionId);
     if (detail) detail.style.display = 'block';
+
+    // Generate suitability note for selected option
+    generateSuitabilityNote(optionId);
 }
+
+function generateSuitabilityNote(optionId) {
+    if (!window.AI_OPTIONS || !window.CLIENT_PROFILE) return;
+
+    const option = window.AI_OPTIONS.find(function(o) {
+        return o.id === optionId;
+    });
+    if (!option) return;
+
+    const noteEl = document.getElementById('suitability-note-' + optionId);
+    if (!noteEl) return;
+
+    // Check if already generated
+    if (noteEl.dataset.generated === 'true') return;
+
+    noteEl.textContent = '⏳ Generating compliance suitability note...';
+    noteEl.style.fontStyle = 'italic';
+    noteEl.style.color = 'var(--text-muted)';
+
+    fetch('/generate-suitability-note', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            client_name: window.CLIENT_PROFILE.client_name,
+            age:         window.CLIENT_PROFILE.age,
+            life_stage:  window.CLIENT_PROFILE.life_stage,
+            risk:        window.CLIENT_PROFILE.risk,
+            horizon:     window.CLIENT_PROFILE.horizon,
+            amount:      window.CLIENT_PROFILE.amount,
+            option_id:   option.id,
+            option_name: option.name,
+            instruments: option.instruments || {},
+            market_data: window.AI_MARKET_DATA || {}
+        })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) {
+            noteEl.textContent = data.note;
+            noteEl.style.fontStyle = '';
+            noteEl.style.color = '';
+            noteEl.dataset.generated = 'true';
+
+            // Update hidden field for saving
+            const saveNote = document.getElementById('save-suitability');
+            if (saveNote) saveNote.value = data.note;
+        } else {
+            noteEl.textContent = 'Could not generate note. Please try again.';
+            noteEl.style.fontStyle = '';
+        }
+    })
+    .catch(function() {
+        noteEl.textContent = 'Could not generate note. Please try again.';
+        noteEl.style.fontStyle = '';
+    });
+}
+
+// Auto-generate for first option on page load
+document.addEventListener('DOMContentLoaded', function() {
+    {% if result and result.ai_options %}
+    generateSuitabilityNote('{{ result.ai_options[0].id }}');
+    {% endif %}
+});
 
 function showTab(tabId, button, group) {
     document.querySelectorAll('[data-group="' + group + '"]').forEach(function(c) {
@@ -1377,7 +1436,9 @@ function onSliderChange(optionId, changedKey, newValue) {
     if (val) val.textContent = newValue + '%';
 
     const alloc = window.CUSTOM_ALLOCATIONS[optionId];
-    const total = Object.values(alloc).reduce((a, b) => a + b, 0);
+    const total = Object.values(alloc).reduce(function(a, b) {
+        return a + b;
+    }, 0);
 
     const totalEl = document.getElementById('total-' + optionId);
     if (totalEl) {
@@ -1429,8 +1490,8 @@ function validateTicker(input, optionId, category) {
 
     validateTimer = setTimeout(function() {
         fetch('/validate-ticker/' + ticker)
-            .then(r => r.json())
-            .then(data => {
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
                 if (data.valid) {
                     tickerCache[ticker] = data;
                     if (feedback) {
@@ -1445,7 +1506,7 @@ function validateTicker(input, optionId, category) {
                     }
                 }
             })
-            .catch(() => {
+            .catch(function() {
                 if (feedback) {
                     feedback.textContent = 'Could not validate';
                     feedback.className = 'ticker-feedback invalid';
@@ -1498,8 +1559,8 @@ function addInstrument(optionId, category) {
         '<div class="instr-row-ticker">' + ticker + '</div>' +
         '<div class="instr-row-name">' + name + '</div>' +
         '<div class="instr-row-pct">' + pct + '%</div>' +
-        '<button class="instr-remove-btn" ' +
-        'onclick="removeInstrument(\'' + rowId + '\')">×</button>';
+        '<button class="instr-remove-btn" onclick="removeInstrument(\'' +
+        rowId + '\')">×</button>';
     if (list) list.appendChild(row);
 
     if (tickerInput) tickerInput.value = '';
@@ -1544,19 +1605,23 @@ function saveClient(optionId, optionName, useCustom) {
         optionId + ' - ' + optionName +
         (useCustom ? ' (Advisor Customized)' : '');
 
-    // Save full AI data for recommendations history
+    // Get the current suitability note from the display element
+    const noteEl = document.getElementById('suitability-note-' + optionId);
+    const saveNote = document.getElementById('save-suitability');
+    if (noteEl && saveNote && noteEl.dataset.generated === 'true') {
+        saveNote.value = noteEl.textContent;
+    }
+
+    // Save full AI data
     const aiDataEl = document.getElementById('save-ai_data');
     if (aiDataEl) {
         try {
-            const aiPayload = {
+            aiDataEl.value = JSON.stringify({
                 options:        window.AI_OPTIONS        || [],
                 market_context: window.AI_MARKET_CONTEXT || '',
                 advisor_note:   window.AI_ADVISOR_NOTE   || ''
-            };
-            aiDataEl.value = JSON.stringify(aiPayload);
-            console.log('AI data saved, options:', aiPayload.options.length);
+            });
         } catch(e) {
-            console.log('AI data error:', e);
             aiDataEl.value = '{}';
         }
     }

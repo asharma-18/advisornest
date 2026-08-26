@@ -1,3 +1,4 @@
+from ai_logic import generate_ai_recommendation, get_fallback_recommendation, generate_suitability_note_ai
 from recommendations_db import (
     save_recommendation, get_all_recommendations,
     get_client_recommendations, get_recommendation,
@@ -215,12 +216,15 @@ def settings():
             flash("Full name cannot be empty.", "error")
             return redirect(url_for("main.settings"))
 
+        license_number = request.form.get("license_number", "").strip()
+
         try:
             from auth import supabase
             supabase.table("advisors")\
                 .update({
-                    "full_name": full_name,
-                    "firm_name": firm_name
+                    "full_name":      full_name,
+                    "firm_name":      firm_name,
+                    "license_number": license_number,
                 })\
                 .eq("id", advisor_id)\
                 .execute()
@@ -228,6 +232,7 @@ def settings():
             # Update session too
             session["advisor"]["full_name"] = full_name
             session["advisor"]["firm_name"] = firm_name
+            session["advisor"]["license_number"] = license_number
             session.modified = True
 
             flash("Profile updated successfully.", "success")
@@ -455,10 +460,21 @@ def portal():
         allocation = calculate_allocation(risk, horizon, age)
         score      = portfolio_score(risk, horizon, age)
         flags      = get_advisor_flags(risk, horizon, age)
-        suitability_note = generate_suitability_note(
-            client_name, age, life_stage,
-            risk, horizon, amount, allocation
+
+        # Use AI suitability note from recommended option
+        # Fall back to generated note if AI note not available
+        recommended_option = next(
+            (o for o in ai_options if o.get("recommended")),
+            ai_options[0] if ai_options else None
         )
+
+        if recommended_option and recommended_option.get("suitability_note"):
+            suitability_note = recommended_option["suitability_note"]
+        else:
+            suitability_note = generate_suitability_note(
+                client_name, age, life_stage,
+                risk, horizon, amount, allocation
+            )
 
         # Score color and label
         if score >= 80:
@@ -742,6 +758,41 @@ def download_pdf(client_id):
         flash("Client not found.", "error")
         return redirect(url_for("main.clients"))
 
+    # Get latest recommendation for this client
+    # to include instrument picks in the PDF
+    try:
+        recs = get_client_recommendations(advisor_id, client_id)
+        if recs:
+            latest_rec = recs[0]
+            ai_data    = latest_rec.get("ai_data", {})
+
+            # Find the selected option from ai_data
+            selected_option_label = latest_rec.get("selected_option", "")
+            selected_option_id    = selected_option_label[0] if selected_option_label else None
+
+            if ai_data and selected_option_id:
+                options = ai_data.get("options", [])
+                selected = next(
+                    (o for o in options
+                     if o.get("id") == selected_option_id),
+                    options[0] if options else None
+                )
+                if selected:
+                    client["recommendation_data"] = selected
+    except Exception as e:
+        print(f"Could not fetch recommendation data: {str(e)}")
+
+    pdf_buffer = generate_pdf_report(client, session["advisor"])
+
+    filename = f"AdvisorNest_{client['client_name'].replace(' ', '_')}_Report.pdf"
+
+    return send_file(
+        pdf_buffer,
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=filename
+    )
+
     # Generate the PDF
     pdf_buffer = generate_pdf_report(client, session["advisor"])
 
@@ -783,3 +834,35 @@ def validate_ticker(ticker):
         return json.dumps({"valid": False})
     except Exception:
         return json.dumps({"valid": False})
+
+ # ── Generate Suitability Note ─────────────────────────────
+@main.route("/generate-suitability-note", methods=["POST"])
+def generate_suitability_note_route():
+    if not session.get("logged_in"):
+        return json.dumps({"success": False, "error": "Not logged in"})
+
+    try:
+        data = request.get_json()
+
+        client_name = data.get("client_name", "")
+        age         = data.get("age", 0)
+        life_stage  = data.get("life_stage", "")
+        risk        = data.get("risk", "")
+        horizon     = data.get("horizon", 0)
+        amount      = data.get("amount", 0)
+        option_name = data.get("option_name", "")
+        option_id   = data.get("option_id", "")
+        instruments = data.get("instruments", {})
+        market_data = data.get("market_data", {})
+
+        result = generate_suitability_note_ai(
+            client_name, age, life_stage, risk,
+            horizon, amount, option_name, option_id,
+            instruments, market_data
+        )
+
+        return json.dumps(result)
+
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
