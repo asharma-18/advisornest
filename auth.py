@@ -26,11 +26,13 @@ def register_advisor(email, password, full_name, firm_name):
 
         user_id = auth_response.user.id
 
+        from datetime import datetime, timezone
         supabase.table("advisors").insert({
-            "id":             user_id,
-            "full_name":      full_name,
-            "firm_name":      firm_name,
-            "license_number": request.form.get("license_number", ""),
+            "id":               user_id,
+            "full_name":        full_name,
+            "firm_name":        firm_name,
+            "license_number":   request.form.get("license_number", ""),
+            "terms_accepted_at": datetime.now(timezone.utc).isoformat(),
         }).execute()
         return {
             "success": True,

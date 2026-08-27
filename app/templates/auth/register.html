@@ -712,6 +712,34 @@
 
                 </div>
 
+                               <div style="margin-bottom:16px">
+                    <label style="display:flex;align-items:flex-start;
+                                  gap:10px;cursor:pointer">
+                        <input type="checkbox"
+                               name="terms_accepted"
+                               required
+                               style="margin-top:3px;flex-shrink:0;
+                                      accent-color:var(--navy)">
+                        <span style="font-size:0.8rem;
+                                     color:var(--text-secondary);
+                                     line-height:1.6">
+                            I agree to the
+                            <a href="{{ url_for('main.terms') }}"
+                               target="_blank"
+                               style="color:var(--navy);font-weight:600">
+                                Terms of Service
+                            </a>
+                            and
+                            <a href="{{ url_for('main.privacy') }}"
+                               target="_blank"
+                               style="color:var(--navy);font-weight:600">
+                                Privacy Policy
+                            </a>.
+                            I confirm I am a licensed financial advisor.
+                        </span>
+                    </label>
+                </div>
+
                 <button type="submit" class="auth-btn">
                     Create My AdvisorNest Account
                 </button>
