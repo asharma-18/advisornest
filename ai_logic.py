@@ -2,22 +2,85 @@ import os
 import json
 from openai import OpenAI
 from dotenv import load_dotenv
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 load_dotenv()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+# ── Option Definitions ────────────────────────────────────
+OPTION_DEFINITIONS = {
+    "A": {
+        "name": "Capital Preservation",
+        "tagline": "Safety and income above all else",
+        "recommended": False,
+        "ranges": {
+            "equity_etfs":   "5 to 15",
+            "growth_stocks": "0",
+            "bond_etfs":     "40 to 55",
+            "mutual_funds":  "20 to 30",
+            "cds":           "15 to 25"
+        },
+        "context": "This is the MOST CONSERVATIVE option. Focus on capital preservation, income, and safety. Minimal equity exposure. Heavy fixed income and CDs."
+    },
+    "B": {
+        "name": "Conservative Growth",
+        "tagline": "Stability with modest appreciation",
+        "recommended": False,
+        "ranges": {
+            "equity_etfs":   "20 to 30",
+            "growth_stocks": "0 to 8",
+            "bond_etfs":     "30 to 40",
+            "mutual_funds":  "15 to 25",
+            "cds":           "10 to 20"
+        },
+        "context": "This is the SECOND most conservative option. Slightly more equity than Option A but still bond-heavy. Option A is more conservative than this. Option C is more aggressive than this."
+    },
+    "C": {
+        "name": "Balanced Growth",
+        "tagline": "Optimal risk-adjusted returns",
+        "recommended": True,
+        "ranges": {
+            "equity_etfs":   "30 to 40",
+            "growth_stocks": "10 to 20",
+            "bond_etfs":     "20 to 30",
+            "mutual_funds":  "10 to 20",
+            "cds":           "5 to 15"
+        },
+        "context": "This is the BALANCED option and the AI recommended choice. Equal weight between growth and stability. Option B is more conservative than this. Option D is more aggressive than this."
+    },
+    "D": {
+        "name": "Aggressive Growth",
+        "tagline": "Maximum long-term growth potential",
+        "recommended": False,
+        "ranges": {
+            "equity_etfs":   "35 to 50",
+            "growth_stocks": "25 to 40",
+            "bond_etfs":     "5 to 15",
+            "mutual_funds":  "5 to 15",
+            "cds":           "0 to 8"
+        },
+        "context": "This is the MOST AGGRESSIVE option. Maximum equity and growth stock exposure. Minimal fixed income. Option C is more conservative than this."
+    }
+}
 
-def generate_ai_recommendation(
-    client_name, age, life_stage, risk,
-    horizon, amount, market_data
+
+def generate_single_option(
+    option_id, client_name, age, life_stage,
+    risk, horizon, amount, market_data
 ):
+    """Generates a single portfolio option."""
     rates = market_data.get("rates", {})
     treasury_10y = rates.get("10_year_treasury", "N/A")
     treasury_1y  = rates.get("1_year_treasury", "N/A")
     cd_1y        = rates.get("cd_1_year", "N/A")
 
-    prompt = f"""You are a senior compliance officer and portfolio analyst at a registered investment advisory firm providing DECISION SUPPORT to licensed financial advisors. The advisor makes all final decisions.
+    opt = OPTION_DEFINITIONS[option_id]
+    ranges = opt["ranges"]
+
+    prompt = f"""You are a senior portfolio analyst providing DECISION SUPPORT to licensed financial advisors.
+
+Generate ONE specific portfolio option for this client.
 
 CLIENT PROFILE:
 - Name: {client_name}
@@ -32,250 +95,79 @@ CURRENT MARKET CONDITIONS:
 - 1-Year Treasury Yield: {treasury_1y}%
 - Best 1-Year CD Rate: {cd_1y}%
 
-APPROVED INSTRUMENT UNIVERSE — only use these:
+YOU ARE GENERATING: Option {option_id} — {opt['name']}
+{opt['context']}
 
-EQUITY ETFs (equity_etfs):
-hold_period must be "Core — Long Term Hold" or "Tactical — 12 to 18 Months"
-VOO, VTI, ITOT, SCHB, IVV, SCHD, VYM, DGRO, NOBL, DVY, QQQ, VUG, SCHG, IWF, VXUS, VEA, VWO, EFA, XLK, XLF, XLV, XLE, XLU, XLP, XLI, AOM, AOA, AOK
+STRICT ALLOCATION RANGES FOR THIS OPTION (must stay within these):
+- equity_etfs:   {ranges['equity_etfs']}%
+- growth_stocks: {ranges['growth_stocks']}%
+- bond_etfs:     {ranges['bond_etfs']}%
+- mutual_funds:  {ranges['mutual_funds']}%
+- cds:           {ranges['cds']}%
+- Total must equal exactly 100%
 
-GROWTH STOCKS (growth_stocks):
-hold_period must be "Strategic — 5 to 10 Years", "Strategic — 10+ Years", "Tactical — 6 to 12 Months", or "Tactical — 12 to 18 Months"
-MSFT, AAPL, GOOGL, AMZN, NVDA, META, JNJ, UNH, PFE, ABBV, JPM, BAC, WFC, GS, HD, MCD, COST, CAT, HON, UNP, BRK-B, PG, KO
+APPROVED INSTRUMENTS ONLY:
 
-BOND ETFs (bond_etfs):
-hold_period must be "Income — Long Term Hold" or "Duration Play — 12 to 24 Months"
-BND, AGG, BNDX, TLT, IEF, SHY, LQD, HYG, TIP, MUB
+EQUITY ETFs: VOO, VTI, ITOT, SCHB, IVV, SCHD, VYM, DGRO, NOBL, DVY, QQQ, VUG, SCHG, IWF, VXUS, VEA, VWO, EFA, XLK, XLF, XLV, XLE, XLU, XLP, XLI, AOM, AOA, AOK
+hold_period: "Core — Long Term Hold" or "Tactical — 12 to 18 Months"
 
-MUTUAL FUNDS (mutual_funds):
-VFIAX, VBTLX, VWELX, FXAIX, FZROX, PIMIX, DODGX
+GROWTH STOCKS: MSFT, AAPL, GOOGL, AMZN, NVDA, META, JNJ, UNH, PFE, ABBV, JPM, BAC, WFC, GS, HD, MCD, COST, CAT, HON, UNP, BRK-B, PG, KO
+hold_period: "Strategic — 5 to 10 Years", "Strategic — 10+ Years", "Tactical — 6 to 12 Months", "Tactical — 12 to 18 Months"
 
-CDs (cds):
-CD-3M, CD-6M, CD-1Y, CD-2Y, TBILL
+BOND ETFs: BND, AGG, BNDX, TLT, IEF, SHY, LQD, HYG, TIP, MUB
+hold_period: "Income — Long Term Hold" or "Duration Play — 12 to 24 Months"
+
+MUTUAL FUNDS: VFIAX, VBTLX, VWELX, FXAIX, FZROX, PIMIX, DODGX
+
+CDs: CD-3M, CD-6M, CD-1Y, CD-2Y, TBILL
 
 RULES:
-- Only use instruments from the approved universe
-- Amounts under $50K: prefer ETFs over individual stocks
-- Amounts over $200K high risk: individual stocks appropriate
-- Client over 60 with high risk: flag it
-- Client under 35 with low risk: flag it
-- Each option allocation sums to exactly 100
-- equity_etfs + growth_stocks + bond_etfs + mutual_funds + cds = 100
+- Only use instruments from the approved lists above
+- If growth_stocks range is 0% leave the array empty
+- Amounts under $50K prefer ETFs over individual stocks
+- Client over 60 with high risk: add a flag
+- Client under 35 with low risk: add a flag
 
-SUITABILITY NOTE REQUIREMENTS — this is critical:
-Each suitability_note must be exactly 4 paragraphs using formal SEC and FINRA compliance language:
-
-Paragraph 1 — CLIENT PROFILE AND OBJECTIVES:
-State the client name, age, life stage, investment amount, risk tolerance and time horizon. Describe the investment objective this option is designed to meet.
-
-Paragraph 2 — EQUITY SUITABILITY:
-Explain why each specific equity instrument selected is appropriate for this client. Reference the client age, risk tolerance and time horizon. For each ticker mentioned explain its role in the portfolio.
-
-Paragraph 3 — FIXED INCOME AND GUARANTEED INSTRUMENTS:
-Explain why the bond ETFs, mutual funds and CDs selected are appropriate. Reference current market conditions specifically mentioning the 10-Year Treasury yield of {treasury_10y}% and CD rate of {cd_1y}%. Explain how these provide stability relative to the client profile.
-
-Paragraph 4 — SUITABILITY DETERMINATION:
-State that based on the above analysis this recommendation is suitable for the named client. Reference that the licensed advisor has reviewed this recommendation and determined it meets the client suitability requirements under applicable regulations. State that this document was prepared using AdvisorNest as a decision support tool and that the final investment decision rests with the licensed advisor.
-
-Generate exactly 4 options A B C D from most conservative to most aggressive. Mark one recommended=true.
-
-Return ONLY valid JSON:
+Return ONLY this exact JSON structure:
 {{
-  "options": [
-    {{
-      "id": "A",
-      "name": "Capital Preservation",
-      "tagline": "Safety and income above all else",
-      "recommended": false,
-      "allocation": {{
-        "equity_etfs": 10,
-        "growth_stocks": 0,
-        "bond_etfs": 45,
-        "mutual_funds": 25,
-        "cds": 20
-      }},
-      "instruments": {{
-        "equity_etfs": [
-          {{
-            "ticker": "SCHD",
-            "name": "Schwab US Dividend Equity ETF",
-            "allocation_pct": 10,
-            "dollar_amount": 0,
-            "reasoning": "Defensive dividend ETF for conservative income",
-            "conviction": "High",
-            "hold_period": "Core — Long Term Hold"
-          }}
-        ],
-        "growth_stocks": [],
-        "bond_etfs": [
-          {{
-            "ticker": "BND",
-            "name": "Vanguard Total Bond Market ETF",
-            "allocation_pct": 25,
-            "dollar_amount": 0,
-            "reasoning": "Core bond exposure for stability",
-            "conviction": "High",
-            "hold_period": "Income — Long Term Hold"
-          }},
-          {{
-            "ticker": "MUB",
-            "name": "iShares National Muni Bond ETF",
-            "allocation_pct": 20,
-            "dollar_amount": 0,
-            "reasoning": "Tax-free municipal bond income",
-            "conviction": "High",
-            "hold_period": "Income — Long Term Hold"
-          }}
-        ],
-        "mutual_funds": [
-          {{
-            "ticker": "VWELX",
-            "name": "Vanguard Wellington Fund",
-            "allocation_pct": 25,
-            "dollar_amount": 0,
-            "reasoning": "90-year track record balanced fund",
-            "conviction": "High",
-            "hold_period": "Core — Long Term Hold"
-          }}
-        ],
-        "cds": [
-          {{
-            "ticker": "CD-1Y",
-            "name": "1-Year Certificate of Deposit",
-            "allocation_pct": 20,
-            "dollar_amount": 0,
-            "reasoning": "FDIC insured guaranteed return at current attractive rates",
-            "conviction": "High",
-            "hold_period": "1 Year"
-          }}
-        ]
-      }},
-      "reasoning": "Write 2-3 specific paragraphs explaining why this Capital Preservation allocation suits {client_name} aged {age} with {risk} risk tolerance and {horizon} year horizon given current market conditions.",
-      "key_considerations": [
-        "Specific consideration 1 for this client",
-        "Specific consideration 2",
-        "Specific consideration 3"
-      ],
-      "flags": [],
-      "suitability_note": "Write exactly 4 formal compliance paragraphs for Option A Capital Preservation as described in the SUITABILITY NOTE REQUIREMENTS above. Reference SCHD, BND, MUB, VWELX, CD-1Y specifically. Use formal SEC FINRA language. Client is {client_name} age {age} {life_stage} ${amount:,} {risk} risk {horizon} years. Current 10Y Treasury {treasury_10y}% CD rate {cd_1y}%."
-    }},
-    {{
-      "id": "B",
-      "name": "Conservative Growth",
-      "tagline": "Stability with modest appreciation",
-      "recommended": false,
-      "allocation": {{
-        "equity_etfs": 25,
-        "growth_stocks": 5,
-        "bond_etfs": 35,
-        "mutual_funds": 20,
-        "cds": 15
-      }},
-      "instruments": {{
-        "equity_etfs": [
-          {{"ticker": "VOO", "name": "Vanguard S&P 500 ETF", "allocation_pct": 15, "dollar_amount": 0, "reasoning": "Core broad market exposure", "conviction": "High", "hold_period": "Core — Long Term Hold"}},
-          {{"ticker": "SCHD", "name": "Schwab Dividend ETF", "allocation_pct": 10, "dollar_amount": 0, "reasoning": "Dividend income component", "conviction": "High", "hold_period": "Core — Long Term Hold"}}
-        ],
-        "growth_stocks": [
-          {{"ticker": "JNJ", "name": "Johnson & Johnson", "allocation_pct": 5, "dollar_amount": 0, "reasoning": "Defensive quality dividend stock", "conviction": "Medium", "hold_period": "Strategic — 5 to 10 Years"}}
-        ],
-        "bond_etfs": [
-          {{"ticker": "BND", "name": "Vanguard Total Bond Market ETF", "allocation_pct": 20, "dollar_amount": 0, "reasoning": "Core bond exposure for stability", "conviction": "High", "hold_period": "Income — Long Term Hold"}},
-          {{"ticker": "TIP", "name": "iShares TIPS Bond ETF", "allocation_pct": 15, "dollar_amount": 0, "reasoning": "Inflation protection for purchasing power", "conviction": "High", "hold_period": "Income — Long Term Hold"}}
-        ],
-        "mutual_funds": [
-          {{"ticker": "VWELX", "name": "Vanguard Wellington Fund", "allocation_pct": 20, "dollar_amount": 0, "reasoning": "Proven balanced fund allocation", "conviction": "High", "hold_period": "Core — Long Term Hold"}}
-        ],
-        "cds": [
-          {{"ticker": "CD-1Y", "name": "1-Year Certificate of Deposit", "allocation_pct": 15, "dollar_amount": 0, "reasoning": "FDIC guaranteed return at current rates", "conviction": "High", "hold_period": "1 Year"}}
-        ]
-      }},
-      "reasoning": "Write 2-3 specific paragraphs for Option B Conservative Growth for {client_name}.",
-      "key_considerations": ["Consideration 1", "Consideration 2", "Consideration 3"],
-      "flags": [],
-      "suitability_note": "Write exactly 4 formal compliance paragraphs for Option B Conservative Growth. Reference VOO, SCHD, JNJ, BND, TIP, VWELX, CD-1Y specifically. Client is {client_name} age {age} {life_stage} ${amount:,} {risk} risk {horizon} years. Current 10Y Treasury {treasury_10y}% CD rate {cd_1y}%. Use formal SEC FINRA compliance language."
-    }},
-    {{
-      "id": "C",
-      "name": "Balanced Growth",
-      "tagline": "Optimal risk-adjusted returns",
-      "recommended": true,
-      "allocation": {{
-        "equity_etfs": 35,
-        "growth_stocks": 15,
-        "bond_etfs": 25,
-        "mutual_funds": 15,
-        "cds": 10
-      }},
-      "instruments": {{
-        "equity_etfs": [
-          {{"ticker": "VOO", "name": "Vanguard S&P 500 ETF", "allocation_pct": 20, "dollar_amount": 0, "reasoning": "Core broad market ETF exposure", "conviction": "High", "hold_period": "Core — Long Term Hold"}},
-          {{"ticker": "QQQ", "name": "Invesco Nasdaq 100 ETF", "allocation_pct": 15, "dollar_amount": 0, "reasoning": "Technology and growth sector tilt", "conviction": "Medium", "hold_period": "Core — Long Term Hold"}}
-        ],
-        "growth_stocks": [
-          {{"ticker": "MSFT", "name": "Microsoft Corporation", "allocation_pct": 8, "dollar_amount": 0, "reasoning": "AI cloud leadership with consistent revenue growth", "conviction": "High", "hold_period": "Strategic — 5 to 10 Years"}},
-          {{"ticker": "GOOGL", "name": "Alphabet Inc", "allocation_pct": 7, "dollar_amount": 0, "reasoning": "Diversified technology with AI integration", "conviction": "High", "hold_period": "Strategic — 5 to 10 Years"}}
-        ],
-        "bond_etfs": [
-          {{"ticker": "BND", "name": "Vanguard Total Bond Market ETF", "allocation_pct": 15, "dollar_amount": 0, "reasoning": "Broad investment grade bond exposure", "conviction": "High", "hold_period": "Income — Long Term Hold"}},
-          {{"ticker": "LQD", "name": "iShares Investment Grade Corp ETF", "allocation_pct": 10, "dollar_amount": 0, "reasoning": "Investment grade corporate bond yield premium", "conviction": "Medium", "hold_period": "Income — Long Term Hold"}}
-        ],
-        "mutual_funds": [
-          {{"ticker": "FXAIX", "name": "Fidelity 500 Index Fund", "allocation_pct": 15, "dollar_amount": 0, "reasoning": "Ultra low cost S&P 500 index exposure", "conviction": "High", "hold_period": "Core — Long Term Hold"}}
-        ],
-        "cds": [
-          {{"ticker": "CD-1Y", "name": "1-Year Certificate of Deposit", "allocation_pct": 10, "dollar_amount": 0, "reasoning": "FDIC insured liquidity buffer at attractive rate", "conviction": "High", "hold_period": "1 Year"}}
-        ]
-      }},
-      "reasoning": "Write 2-3 specific paragraphs for Option C Balanced Growth for {client_name}.",
-      "key_considerations": ["Consideration 1", "Consideration 2", "Consideration 3"],
-      "flags": [],
-      "suitability_note": "Write exactly 4 formal compliance paragraphs for Option C Balanced Growth. Reference VOO, QQQ, MSFT, GOOGL, BND, LQD, FXAIX, CD-1Y specifically. Client is {client_name} age {age} {life_stage} ${amount:,} {risk} risk {horizon} years. Current 10Y Treasury {treasury_10y}% CD rate {cd_1y}%. Use formal SEC FINRA compliance language."
-    }},
-    {{
-      "id": "D",
-      "name": "Aggressive Growth",
-      "tagline": "Maximum long-term growth potential",
-      "recommended": false,
-      "allocation": {{
-        "equity_etfs": 40,
-        "growth_stocks": 35,
-        "bond_etfs": 10,
-        "mutual_funds": 10,
-        "cds": 5
-      }},
-      "instruments": {{
-        "equity_etfs": [
-          {{"ticker": "QQQ", "name": "Invesco Nasdaq 100 ETF", "allocation_pct": 20, "dollar_amount": 0, "reasoning": "High growth technology sector concentration", "conviction": "High", "hold_period": "Core — Long Term Hold"}},
-          {{"ticker": "VUG", "name": "Vanguard Growth ETF", "allocation_pct": 20, "dollar_amount": 0, "reasoning": "Large cap growth factor exposure", "conviction": "High", "hold_period": "Core — Long Term Hold"}}
-        ],
-        "growth_stocks": [
-          {{"ticker": "NVDA", "name": "NVIDIA Corporation", "allocation_pct": 12, "dollar_amount": 0, "reasoning": "AI semiconductor market leadership and revenue growth", "conviction": "High", "hold_period": "Strategic — 5 to 10 Years"}},
-          {{"ticker": "MSFT", "name": "Microsoft Corporation", "allocation_pct": 12, "dollar_amount": 0, "reasoning": "Cloud and AI platform dominance", "conviction": "High", "hold_period": "Strategic — 10+ Years"}},
-          {{"ticker": "GOOGL", "name": "Alphabet Inc", "allocation_pct": 11, "dollar_amount": 0, "reasoning": "Search advertising and AI revenue diversification", "conviction": "High", "hold_period": "Strategic — 5 to 10 Years"}}
-        ],
-        "bond_etfs": [
-          {{"ticker": "HYG", "name": "iShares High Yield Corporate ETF", "allocation_pct": 10, "dollar_amount": 0, "reasoning": "Higher yield fixed income for aggressive risk profile", "conviction": "Medium", "hold_period": "Duration Play — 12 to 24 Months"}}
-        ],
-        "mutual_funds": [
-          {{"ticker": "DODGX", "name": "Dodge & Cox Stock Fund", "allocation_pct": 10, "dollar_amount": 0, "reasoning": "Active value management with long term track record", "conviction": "Medium", "hold_period": "Core — Long Term Hold"}}
-        ],
-        "cds": [
-          {{"ticker": "CD-3M", "name": "3-Month Certificate of Deposit", "allocation_pct": 5, "dollar_amount": 0, "reasoning": "Minimal liquidity reserve for aggressive portfolio", "conviction": "High", "hold_period": "3 Months"}}
-        ]
-      }},
-      "reasoning": "Write 2-3 specific paragraphs for Option D Aggressive Growth for {client_name}. Note any suitability concerns.",
-      "key_considerations": ["Consideration 1", "Consideration 2", "Consideration 3"],
-      "flags": ["Review aggressive allocation suitability carefully for this specific client profile"],
-      "suitability_note": "Write exactly 4 formal compliance paragraphs for Option D Aggressive Growth. Reference QQQ, VUG, NVDA, MSFT, GOOGL, HYG, DODGX, CD-3M specifically. Client is {client_name} age {age} {life_stage} ${amount:,} {risk} risk {horizon} years. Current 10Y Treasury {treasury_10y}% CD rate {cd_1y}%. Note any risk considerations for this aggressive allocation. Use formal SEC FINRA compliance language."
-    }}
+  "id": "{option_id}",
+  "name": "{opt['name']}",
+  "tagline": "{opt['tagline']}",
+  "recommended": {'true' if opt['recommended'] else 'false'},
+  "allocation": {{
+    "equity_etfs": <number within {ranges['equity_etfs']}>,
+    "growth_stocks": <number within {ranges['growth_stocks']}>,
+    "bond_etfs": <number within {ranges['bond_etfs']}>,
+    "mutual_funds": <number within {ranges['mutual_funds']}>,
+    "cds": <number within {ranges['cds']}>
+  }},
+  "instruments": {{
+    "equity_etfs": [
+      {{"ticker": "VOO", "name": "Vanguard S&P 500 ETF", "allocation_pct": 10, "dollar_amount": 0, "reasoning": "specific reason for this client", "conviction": "High", "hold_period": "Core — Long Term Hold"}}
+    ],
+    "growth_stocks": [],
+    "bond_etfs": [
+      {{"ticker": "BND", "name": "Vanguard Total Bond ETF", "allocation_pct": 20, "dollar_amount": 0, "reasoning": "specific reason for this client", "conviction": "High", "hold_period": "Income — Long Term Hold"}}
+    ],
+    "mutual_funds": [
+      {{"ticker": "VWELX", "name": "Vanguard Wellington Fund", "allocation_pct": 15, "dollar_amount": 0, "reasoning": "specific reason for this client", "conviction": "High", "hold_period": "Core — Long Term Hold"}}
+    ],
+    "cds": [
+      {{"ticker": "CD-1Y", "name": "1-Year Certificate of Deposit", "allocation_pct": 10, "dollar_amount": 0, "reasoning": "specific reason for this client", "conviction": "High", "hold_period": "1 Year"}}
+    ]
+  }},
+  "reasoning": "Write 2-3 specific paragraphs explaining why this exact allocation suits {client_name} aged {age} with {risk} risk tolerance and {horizon} year horizon. Reference current market conditions including 10Y Treasury at {treasury_10y}%.",
+  "key_considerations": [
+    "Specific consideration 1 tailored to this client and option",
+    "Specific consideration 2",
+    "Specific consideration 3"
   ],
-  "market_context": "Write 1-2 sentences on how current market conditions specifically the 10-Year Treasury at {treasury_10y}% and CD rates at {cd_1y}% influenced these recommendations.",
-  "advisor_note": "The licensed financial advisor makes the final investment decision on all recommendations. These recommendations were generated by AdvisorNest as a decision support tool and must be reviewed against the client complete financial picture including existing assets liabilities tax situation and estate planning considerations before implementation."
+  "flags": []
 }}
 
-Calculate dollar_amount for each instrument as (allocation_pct / 100) * {amount}
-Replace all placeholder text with real specific analysis for {client_name}.
-Return ONLY valid JSON. No markdown. No text outside the JSON."""
+Calculate dollar_amount as (allocation_pct / 100) * {amount}
+Replace example instruments with your actual picks from the approved lists.
+Return ONLY valid JSON. No markdown. No explanation."""
 
     try:
         response = client.chat.completions.create(
@@ -283,14 +175,14 @@ Return ONLY valid JSON. No markdown. No text outside the JSON."""
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a senior compliance officer and portfolio analyst at a registered investment advisory firm. Always return valid JSON only. Never recommend instruments outside the approved universe. Write all suitability notes in formal SEC and FINRA compliance language — professional, specific, instrument-referenced, and defensible in a regulatory audit. Always write exactly 4 paragraphs per suitability note."
+                    "content": f"You are generating Option {option_id} — {opt['name']} for a portfolio recommendation tool. Return only valid JSON. Never use instruments outside the approved universe. Keep allocations strictly within the specified ranges."
                 },
                 {
                     "role": "user",
                     "content": prompt
                 }
             ],
-            max_tokens=5000,
+            max_tokens=1200,
             temperature=0.2
         )
 
@@ -303,31 +195,132 @@ Return ONLY valid JSON. No markdown. No text outside the JSON."""
         if content.endswith("```"):
             content = content[:-3]
 
-        result = json.loads(content.strip())
-        return {"success": True, "fallback": False, "data": result}
+        option = json.loads(content.strip())
+        return {"success": True, "option": option}
 
     except json.JSONDecodeError as e:
-        print(f"JSON parse error: {str(e)}")
-        print(f"Raw content: {content[:300]}")
-
-        try:
-            partial = content.strip()
-            for closing in [']}]}', ']}', '}]}']:
-                try:
-                    fixed = partial + closing
-                    result = json.loads(fixed)
-                    if result.get("options"):
-                        print(f"Salvaged {len(result['options'])} options")
-                        return {"success": True, "fallback": False, "data": result}
-                except:
-                    continue
-        except:
-            pass
-
-        return {"success": False, "error": "Could not parse AI response"}
+        print(f"Option {option_id} JSON error: {str(e)}")
+        return {"success": False, "option_id": option_id, "error": str(e)}
 
     except Exception as e:
-        print(f"OpenAI error: {str(e)}")
+        print(f"Option {option_id} error: {str(e)}")
+        return {"success": False, "option_id": option_id, "error": str(e)}
+
+
+def generate_market_context(
+    client_name, risk, treasury_10y, cd_1y
+):
+    """Generates market context and advisor note separately."""
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"""Write a market context statement (1-2 sentences) explaining how current market conditions with 10-Year Treasury at {treasury_10y}% and CD rates at {cd_1y}% influence portfolio recommendations for a {risk} risk client.
+Return only a JSON object:
+{{"market_context": "your 1-2 sentence market context here", "advisor_note": "The licensed financial advisor makes the final investment decision on all recommendations. These recommendations were generated by AdvisorNest as a decision support tool and must be reviewed against the client complete financial picture before implementation."}}"""
+                }
+            ],
+            max_tokens=200,
+            temperature=0.2
+        )
+
+        content = response.choices[0].message.content.strip()
+        if content.startswith("```"):
+            content = content.split("```")[1]
+            if content.startswith("json"):
+                content = content[4:]
+        if content.endswith("```"):
+            content = content[:-3]
+
+        return json.loads(content.strip())
+
+    except Exception as e:
+        print(f"Market context error: {str(e)}")
+        return {
+            "market_context": f"Current market conditions with 10-Year Treasury at {treasury_10y}% and CD rates at {cd_1y}% have influenced these recommendations.",
+            "advisor_note": "The licensed financial advisor makes the final investment decision on all recommendations."
+        }
+
+
+def generate_ai_recommendation(
+    client_name, age, life_stage, risk,
+    horizon, amount, market_data
+):
+    """
+    Generates 4 portfolio options in parallel using ThreadPoolExecutor.
+    Each option is generated simultaneously instead of sequentially.
+    """
+    rates = market_data.get("rates", {})
+    treasury_10y = rates.get("10_year_treasury", "N/A")
+    cd_1y        = rates.get("cd_1_year", "N/A")
+
+    option_ids = ["A", "B", "C", "D"]
+    results = {}
+
+    try:
+        # Run all 4 options + market context in parallel
+        with ThreadPoolExecutor(max_workers=5) as executor:
+
+            # Submit all 4 option generation tasks simultaneously
+            future_to_option = {
+                executor.submit(
+                    generate_single_option,
+                    option_id,
+                    client_name, age, life_stage,
+                    risk, horizon, amount, market_data
+                ): option_id
+                for option_id in option_ids
+            }
+
+            # Also submit market context generation in parallel
+            future_context = executor.submit(
+                generate_market_context,
+                client_name, risk, treasury_10y, cd_1y
+            )
+
+            # Collect results as they complete
+            for future in as_completed(future_to_option):
+                option_id = future_to_option[future]
+                try:
+                    result = future.result()
+                    if result["success"]:
+                        results[option_id] = result["option"]
+                    else:
+                        print(f"Option {option_id} failed: {result.get('error')}")
+                except Exception as e:
+                    print(f"Option {option_id} exception: {str(e)}")
+
+            # Get market context
+            try:
+                context_data = future_context.result()
+            except Exception:
+                context_data = {
+                    "market_context": f"Current market conditions with 10-Year Treasury at {treasury_10y}% influenced these recommendations.",
+                    "advisor_note": "The licensed financial advisor makes the final investment decision."
+                }
+
+        # Check we got all 4 options
+        if len(results) < 4:
+            print(f"Only got {len(results)} options, using fallback")
+            return {"success": False, "error": "Not all options generated"}
+
+        # Sort options A, B, C, D in order
+        ordered_options = [results[oid] for oid in option_ids if oid in results]
+
+        return {
+            "success": True,
+            "fallback": False,
+            "data": {
+                "options": ordered_options,
+                "market_context": context_data.get("market_context", ""),
+                "advisor_note": context_data.get("advisor_note", "")
+            }
+        }
+
+    except Exception as e:
+        print(f"Parallel generation error: {str(e)}")
         return {"success": False, "error": str(e)}
 
 
@@ -365,29 +358,24 @@ def get_fallback_recommendation(risk, age, horizon, amount):
                         "Verify risk tolerance is current",
                         "Consider current market conditions"
                     ],
-                    "flags": [],
-                    "suitability_note": "AI temporarily unavailable. Please regenerate recommendation for a full suitability assessment."
+                    "flags": []
                 }
             ],
             "market_context": "AI analysis temporarily unavailable.",
             "advisor_note": "The advisor makes the final decision on all recommendations."
         }
     }
+
+
 def generate_suitability_note_ai(
     client_name, age, life_stage, risk,
     horizon, amount, option_name, option_id,
     instruments, market_data
 ):
-    """
-    Generates a specific compliance-grade suitability note
-    for the selected portfolio option.
-    Called when advisor selects an option card.
-    """
     rates = market_data.get("rates", {})
     treasury_10y = rates.get("10_year_treasury", "N/A")
     cd_1y = rates.get("cd_1_year", "N/A")
 
-    # Build instrument list for the prompt
     instrument_summary = []
     for category, items in instruments.items():
         for inst in items:
@@ -427,15 +415,15 @@ PARAGRAPH 1 — CLIENT PROFILE AND INVESTMENT OBJECTIVES:
 State the client full name, age, life stage, investment amount, risk tolerance and time horizon. Describe what investment objective this specific option is designed to meet for this client.
 
 PARAGRAPH 2 — EQUITY INSTRUMENT SUITABILITY:
-Explain specifically why each equity instrument selected (ETFs and growth stocks) is appropriate for this client. Reference each ticker by name. Explain how each instrument aligns with the client age, risk tolerance and investment horizon. If no equity instruments, explain why a conservative fixed income focus is appropriate.
+Explain specifically why each equity instrument selected is appropriate for this client. Reference each ticker by name. Explain how each instrument aligns with the client age, risk tolerance and investment horizon. If no equity instruments, explain why a conservative fixed income focus is appropriate.
 
 PARAGRAPH 3 — FIXED INCOME AND GUARANTEED INSTRUMENT SUITABILITY:
-Explain why the bond ETFs, mutual funds and CDs selected are appropriate for this client. Reference the current 10-Year Treasury yield of {treasury_10y}% and CD rate of {cd_1y}% and explain how these market conditions make the fixed income allocation particularly relevant. Reference each ticker by name.
+Explain why the bond ETFs, mutual funds and CDs selected are appropriate for this client. Reference the current 10-Year Treasury yield of {treasury_10y}% and CD rate of {cd_1y}%. Reference each ticker by name.
 
 PARAGRAPH 4 — SUITABILITY DETERMINATION:
 State that based on the above analysis this {option_name} recommendation is suitable for {client_name}. Reference FINRA Rule 2111 and SEC Regulation Best Interest. State that the licensed advisor has reviewed and approved this recommendation. State this was prepared using AdvisorNest as a decision support tool and the final investment decision rests with the licensed advisor.
 
-Write in formal compliance language. Be specific. Reference actual tickers. Do not use placeholder text.
+Write in formal compliance language. Be specific. Reference actual tickers.
 Return ONLY the 4 paragraphs of text. No JSON. No headers. Just the paragraphs separated by blank lines."""
 
     try:

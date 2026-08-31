@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 import yfinance as yf
 import requests
 import os
@@ -31,8 +32,47 @@ MUTUAL_FUNDS = {
 }
 
 
+# ── Fetch single ticker ───────────────────────────────────
+def fetch_single_ticker(ticker):
+    try:
+        stock = yf.Ticker(ticker)
+        info  = stock.info
+
+        price       = info.get("currentPrice") or info.get("regularMarketPrice") or info.get("navPrice", 0)
+        name        = info.get("longName") or info.get("shortName", ticker)
+        pe          = info.get("trailingPE", None)
+        div_yield   = info.get("dividendYield", None)
+        week52_high = info.get("fiftyTwoWeekHigh", None)
+        week52_low  = info.get("fiftyTwoWeekLow", None)
+        expense     = info.get("annualReportExpenseRatio", None)
+
+        return {
+            "ticker":         ticker,
+            "name":           name,
+            "price":          round(price, 2) if price else "N/A",
+            "pe_ratio":       round(pe, 1) if pe else "N/A",
+            "dividend_yield": f"{round(div_yield * 100, 2)}%" if div_yield and div_yield < 1 else f"{round(div_yield, 2)}%" if div_yield else "N/A",
+            "52w_high":       round(week52_high, 2) if week52_high else "N/A",
+            "52w_low":        round(week52_low, 2) if week52_low else "N/A",
+            "expense_ratio":  f"{round(expense * 100, 2)}%" if expense else "N/A",
+        }
+
+    except Exception:
+        return {
+            "ticker":         ticker,
+            "name":           ticker,
+            "price":          "N/A",
+            "pe_ratio":       "N/A",
+            "dividend_yield": "N/A",
+            "52w_high":       "N/A",
+            "52w_low":        "N/A",
+            "expense_ratio":  "N/A",
+        }
+
+
 # ── Fetch stock data ──────────────────────────────────────
 def get_stock_data(risk, category="long"):
+    from concurrent.futures import ThreadPoolExecutor
     risk = risk.lower()
 
     if category == "long":
@@ -44,45 +84,10 @@ def get_stock_data(risk, category="long"):
     else:
         tickers = MUTUAL_FUNDS.get(risk, MUTUAL_FUNDS["medium"])
 
-    results = []
-    for ticker in tickers:
-        try:
-            stock = yf.Ticker(ticker)
-            info  = stock.info
-
-            price       = info.get("currentPrice") or info.get("regularMarketPrice") or info.get("navPrice", 0)
-            name        = info.get("longName") or info.get("shortName", ticker)
-            pe          = info.get("trailingPE", None)
-            div_yield   = info.get("dividendYield", None)
-            week52_high = info.get("fiftyTwoWeekHigh", None)
-            week52_low  = info.get("fiftyTwoWeekLow", None)
-            expense     = info.get("annualReportExpenseRatio", None)
-
-            results.append({
-                "ticker":         ticker,
-                "name":           name,
-                "price":          round(price, 2) if price else "N/A",
-                "pe_ratio":       round(pe, 1) if pe else "N/A",
-                "dividend_yield": f"{round(div_yield * 100, 2)}%" if div_yield and div_yield < 1 else f"{round(div_yield, 2)}%" if div_yield else "N/A",
-                "52w_high":       round(week52_high, 2) if week52_high else "N/A",
-                "52w_low":        round(week52_low, 2) if week52_low else "N/A",
-                "expense_ratio":  f"{round(expense * 100, 2)}%" if expense else "N/A",
-            })
-
-        except Exception:
-            results.append({
-                "ticker":         ticker,
-                "name":           ticker,
-                "price":          "N/A",
-                "pe_ratio":       "N/A",
-                "dividend_yield": "N/A",
-                "52w_high":       "N/A",
-                "52w_low":        "N/A",
-                "expense_ratio":  "N/A",
-            })
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        results = list(executor.map(fetch_single_ticker, tickers))
 
     return results
-
 
 # ── Fetch Treasury & CD rates from FRED ──────────────────
 def get_rates():
@@ -125,10 +130,19 @@ def get_rates():
 
 # ── Get all market data for a client profile ─────────────
 def get_all_market_data(risk):
-    return {
-        "stocks_lt":    get_stock_data(risk, "long"),
-        "stocks_st":    get_stock_data(risk, "short"),
-        "bonds":        get_stock_data(risk, "bonds"),
-        "mutual_funds": get_stock_data(risk, "mutual"),
-        "rates":        get_rates()
-    }
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        future_lt     = executor.submit(get_stock_data, risk, "long")
+        future_st     = executor.submit(get_stock_data, risk, "short")
+        future_bonds  = executor.submit(get_stock_data, risk, "bonds")
+        future_mutual = executor.submit(get_stock_data, risk, "mutual")
+        future_rates  = executor.submit(get_rates)
+
+        return {
+            "stocks_lt":    future_lt.result(),
+            "stocks_st":    future_st.result(),
+            "bonds":        future_bonds.result(),
+            "mutual_funds": future_mutual.result(),
+            "rates":        future_rates.result()
+        }

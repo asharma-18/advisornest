@@ -426,18 +426,33 @@ def portal():
                 result=None)
 
         # Fetch live market data first
+        from concurrent.futures import ThreadPoolExecutor
+
+        # Fetch FRED rates first (fast - needed by GPT)
         try:
-            market_data = get_all_market_data(risk)
+            from market_data import get_rates
+            rates_only = {"rates": get_rates()}
         except Exception:
-            market_data = None
+            rates_only = {"rates": {}}
 
-        # Generate AI recommendation
-        ai_result = generate_ai_recommendation(
-            client_name, age, life_stage, risk,
-            horizon, amount,
-            market_data if market_data else {}
-        )
+        # Run market prices and AI simultaneously
+        def fetch_market():
+            try:
+                return get_all_market_data(risk)
+            except Exception:
+                return rates_only
 
+        def fetch_ai():
+            return generate_ai_recommendation(
+                client_name, age, life_stage,
+                risk, horizon, amount, rates_only
+            )
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            future_market = executor.submit(fetch_market)
+            future_ai     = executor.submit(fetch_ai)
+            market_data   = future_market.result()
+            ai_result     = future_ai.result()
      # Use fallback if AI fails
         if not ai_result["success"]:
             ai_result = get_fallback_recommendation(
@@ -521,7 +536,6 @@ def portal():
 
         result["allocation_json"] = json.dumps(allocation)
         result["flags_json"]      = json.dumps(flags)
-
     return render_template("portal/index.html",
         advisor=session.get("advisor"),
         result=result,
