@@ -15,6 +15,7 @@
 
 <div class="app-layout">
 
+    <!-- ── Desktop Sidebar ─────────────────────────────── -->
     <aside class="sidebar">
         <div class="sidebar-logo">
             <div class="sidebar-logo-text">Advisor<span>Nest</span></div>
@@ -37,7 +38,6 @@
                 <span class="sidebar-nav-icon">👥</span>
                 <span class="sidebar-nav-label">My Clients</span>
             </a>
-          
             <a href="{{ url_for('main.recommendations') }}"
                class="sidebar-nav-item {% if request.endpoint in ['main.recommendations', 'main.view_recommendation'] %}active{% endif %}">
                 <span class="sidebar-nav-icon">📋</span>
@@ -48,7 +48,6 @@
                 <span class="sidebar-nav-icon">📝</span>
                 <span class="sidebar-nav-label">Meeting Notes</span>
             </a>
-          
             <a href="{{ url_for('main.settings') }}"
                class="sidebar-nav-item {% if request.endpoint == 'main.settings' %}active{% endif %}">
                 <span class="sidebar-nav-icon">⚙️</span>
@@ -77,6 +76,17 @@
     </aside>
 
     <div class="app-main">
+
+        <!-- ── Mobile Top Bar ──────────────────────────── -->
+        <div class="mobile-topbar">
+            <div class="mobile-topbar-logo">
+                Advisor<span>Nest</span>
+            </div>
+            <div class="mobile-topbar-advisor">
+            {{ session.get('advisor', {}).get('full_name', '').split()[0] }} · {{ session.get('advisor', {}).get('firm_name') or 'Independent' }}
+            </div>
+        </div>
+
         <div class="app-topbar">
             <div class="app-topbar-left">
                 <div class="app-topbar-title">{% block page_title %}{% endblock %}</div>
@@ -102,9 +112,44 @@
         <main class="app-content">
             {% block page_content %}{% endblock %}
         </main>
+
     </div>
 
 </div>
+
+<!-- ── Mobile Bottom Navigation ──────────────────────── -->
+<nav class="mobile-bottom-nav">
+    <a href="{{ url_for('main.dashboard') }}"
+       class="mobile-nav-item {% if request.endpoint == 'main.dashboard' %}active{% endif %}">
+        <span class="mobile-nav-icon">🏠</span>
+        <span class="mobile-nav-label">Home</span>
+    </a>
+    <a href="{{ url_for('main.portal') }}"
+       class="mobile-nav-item {% if request.endpoint == 'main.portal' %}active{% endif %}">
+        <span class="mobile-nav-icon">📊</span>
+        <span class="mobile-nav-label">New Rec</span>
+    </a>
+    <a href="{{ url_for('main.clients') }}"
+       class="mobile-nav-item {% if request.endpoint in ['main.clients', 'main.view_client'] %}active{% endif %}">
+        <span class="mobile-nav-icon">👥</span>
+        <span class="mobile-nav-label">Clients</span>
+    </a>
+    <a href="{{ url_for('main.recommendations') }}"
+       class="mobile-nav-item {% if request.endpoint in ['main.recommendations', 'main.view_recommendation'] %}active{% endif %}">
+        <span class="mobile-nav-icon">📋</span>
+        <span class="mobile-nav-label">Recs</span>
+    </a>
+    <a href="{{ url_for('main.notes') }}"
+       class="mobile-nav-item {% if request.endpoint in ['main.notes', 'main.add_note_route'] %}active{% endif %}">
+        <span class="mobile-nav-icon">📝</span>
+        <span class="mobile-nav-label">Notes</span>
+    </a>
+    <a href="{{ url_for('main.settings') }}"
+       class="mobile-nav-item {% if request.endpoint == 'main.settings' %}active{% endif %}">
+        <span class="mobile-nav-icon">⚙️</span>
+        <span class="mobile-nav-label">Settings</span>
+    </a>
+</nav>
 
 {% else %}
 

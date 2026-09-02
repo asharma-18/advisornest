@@ -430,6 +430,12 @@
             transform: translateY(0);
         }
     }
+@media (max-width: 768px) {
+    .auth-body { grid-template-columns: 1fr !important; }
+    .auth-right { display: none !important; }
+    .auth-left { padding: 20px !important; min-height: 100vh !important; }
+    .auth-card { padding: 20px !important; }
+}
 </style>
 {% endblock %}
 

@@ -663,34 +663,15 @@ def notes():
     advisor_id      = session["advisor"]["user_id"]
     all_clients     = get_all_clients(advisor_id)
     selected_client = request.args.get("client", "").strip()
-    search_query    = request.args.get("q", "").strip()
-
-    # Get notes — filtered by client if selected
-    if selected_client:
-        all_notes = get_client_notes(advisor_id, selected_client)
-    else:
-        all_notes = get_all_notes(advisor_id)
-
-    # Get ALL notes for sidebar counts (unfiltered)
-    all_notes_unfiltered = get_all_notes(advisor_id)
-
-    # Filter by search query
-    if search_query:
-        all_notes = [n for n in all_notes if
-            search_query.lower() in n.get("subject", "").lower() or
-            search_query.lower() in n.get("body", "").lower() or
-            search_query.lower() in (
-                (n.get("clients") or {}).get("client_name", "")
-            ).lower()
-        ]
+    all_notes       = get_all_notes(advisor_id)
 
     return render_template("notes/list.html",
         advisor=session.get("advisor"),
         notes=all_notes,
-        all_notes=all_notes_unfiltered,
+        all_notes=all_notes,
         clients=all_clients,
         selected_client=selected_client,
-        search_query=search_query)
+        search_query="")
 # ── Add Note ──────────────────────────────────────────────
 @main.route("/notes/add", methods=["POST"])
 def add_note_route():

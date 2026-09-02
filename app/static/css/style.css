@@ -1033,3 +1033,230 @@ tr:hover td {
 .app-main .flash-container {
     padding: 12px 32px 0;
 }
+/* ── Mobile Responsiveness ───────────────────────────────
+   Breakpoints:
+   768px  — tablet and below
+   480px  — mobile
+──────────────────────────────────────────────────────── */
+
+/* ── Mobile Responsiveness ───────────────────────────────
+   Bottom nav replaces sidebar on mobile
+──────────────────────────────────────────────────────── */
+
+.mobile-bottom-nav {
+    display: none;
+}
+
+.mobile-topbar {
+    display: none;
+}
+
+@media (max-width: 768px) {
+
+    /* ── Hide desktop sidebar ── */
+    .sidebar {
+        display: none !important;
+    }
+
+    /* ── App layout full width ── */
+    .app-layout {
+        flex-direction: column !important;
+    }
+
+    .app-main {
+        margin-left: 0 !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        flex: 1 !important;
+    }
+
+    /* ── Hide desktop topbar ── */
+    .app-topbar {
+        display: none !important;
+    }
+
+    /* ── Show mobile top bar ── */
+    .mobile-topbar {
+        display: flex !important;
+        align-items: center;
+        justify-content: space-between;
+        background: var(--navy);
+        padding: 14px 16px;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+    }
+
+    .mobile-topbar-logo {
+        font-family: var(--font-heading);
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: white;
+    }
+
+    .mobile-topbar-logo span {
+        color: var(--accent);
+        font-style: italic;
+    }
+
+    .mobile-topbar-advisor {
+        font-size: 0.8rem;
+        color: rgba(255,255,255,0.6);
+        font-family: var(--font-body);
+    }
+
+    /* ── App content padding ── */
+    .app-content {
+        padding: 16px 16px 80px 16px !important;
+    }
+
+    /* ── Show mobile bottom nav ── */
+    .mobile-bottom-nav {
+        display: flex !important;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: var(--navy);
+        border-top: 1px solid rgba(255,255,255,0.1);
+        z-index: 1000;
+        padding: 0;
+        height: 64px;
+    }
+
+    .mobile-nav-item {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        text-decoration: none;
+        color: rgba(255,255,255,0.45);
+        transition: all 0.2s;
+        padding: 8px 4px;
+    }
+
+    .mobile-nav-item.active {
+        color: var(--accent);
+    }
+
+    .mobile-nav-item:hover {
+        color: white;
+    }
+
+    .mobile-nav-icon {
+        font-size: 1.2rem;
+        line-height: 1;
+    }
+
+    .mobile-nav-label {
+        font-size: 0.6rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        font-family: var(--font-body);
+        text-transform: uppercase;
+    }
+
+    /* ── Portal layout single column ── */
+    .portal-layout {
+        grid-template-columns: 1fr !important;
+        gap: 16px !important;
+    }
+
+    .portal-sidebar {
+        position: relative !important;
+        top: 0 !important;
+    }
+
+    /* ── Stats grid ── */
+    .stats-grid {
+        grid-template-columns: 1fr 1fr !important;
+        gap: 10px !important;
+    }
+
+    /* ── Grid utilities ── */
+    .grid-2 {
+        grid-template-columns: 1fr 1fr !important;
+        gap: 10px !important;
+    }
+
+    .grid-3 {
+        grid-template-columns: 1fr !important;
+        gap: 10px !important;
+    }
+
+    .grid-4 {
+        grid-template-columns: 1fr 1fr !important;
+        gap: 10px !important;
+    }
+
+    /* ── Cards ── */
+    .card {
+        padding: 16px !important;
+    }
+
+    /* ── Section header ── */
+    .section-header {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 12px !important;
+    }
+
+    .section-header .btn {
+        width: 100% !important;
+    }
+
+    /* ── Tables scroll horizontally ── */
+    .table-container {
+        overflow-x: auto !important;
+    }
+
+    /* ── Flash messages ── */
+    .flash-container {
+        padding: 12px 16px 0 !important;
+    }
+
+    /* ── Auth pages ── */
+    .auth-body {
+        grid-template-columns: 1fr !important;
+    }
+
+    .auth-right {
+        display: none !important;
+    }
+
+    .auth-left {
+        padding: 24px 20px !important;
+        min-height: 100vh !important;
+    }
+
+    .auth-wrapper {
+        grid-template-columns: 1fr !important;
+    }
+
+    .auth-features-panel {
+        display: none !important;
+    }
+
+    .auth-form-panel {
+        padding: 32px 24px !important;
+    }
+
+    .auth-hero-stats {
+        display: none !important;
+    }
+
+    .auth-hero {
+        padding: 20px 24px !important;
+    }
+        /* ── Action grid ── */
+    .action-grid {
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+    }
+
+    .action-card {
+        padding: 16px !important;
+    }
+}

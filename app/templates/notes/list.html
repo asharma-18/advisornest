@@ -248,6 +248,32 @@
         font-size: 1rem;
         color: var(--text-muted);
     }
+
+    @media (max-width: 768px) {
+        .notes-layout {
+            grid-template-columns: 1fr !important;
+        }
+
+        .notes-sidebar {
+            width: 100% !important;
+            position: relative !important;
+            top: 0 !important;
+        }
+
+        .notes-client-link {
+            padding: 8px 10px !important;
+            font-size: 0.8rem !important;
+        }
+
+        .note-card {
+            padding: 14px 16px !important;
+        }
+
+        .note-actions {
+            flex-wrap: wrap !important;
+            gap: 8px !important;
+        }
+    }
 </style>
 {% endblock %}
 
@@ -274,42 +300,30 @@
     <div class="notes-sidebar">
 
         <div class="notes-search-wrap">
-            <form method="GET"
-                  action="{{ url_for('main.notes') }}"
-                  class="notes-search-form">
-                {% if selected_client %}
-                <input type="hidden" name="client"
-                       value="{{ selected_client }}">
-                {% endif %}
+            <form class="notes-search-form" onsubmit="return false;">
                 <input
                     type="text"
-                    name="q"
                     id="notes-search"
                     class="notes-search-input"
-                    placeholder="Search notes..."
-                    value="{{ search_query }}"
+                    placeholder="Search all notes..."
                     autocomplete="off"
                 >
-                <button type="submit" id="search-submit"
-                        style="display:none"></button>
             </form>
         </div>
 
         <div class="notes-sidebar-label">Filter by Client</div>
 
-        <a href="{{ url_for('main.notes') }}{% if search_query %}?q={{ search_query }}{% endif %}"
-           class="notes-client-link
-           {% if not selected_client %}active{% endif %}">
+        <a href="#" data-client-id=""
+           class="notes-client-link active">
             <span class="notes-client-link-name">All Clients</span>
-            <span class="notes-count-badge">
+            <span class="notes-count-badge" id="all-count">
                 {{ all_notes|length }}
             </span>
         </a>
 
         {% for client in clients %}
-        <a href="{{ url_for('main.notes') }}?client={{ client.id }}{% if search_query %}&q={{ search_query }}{% endif %}"
-           class="notes-client-link
-           {% if selected_client == client.id %}active{% endif %}">
+        <a href="#" data-client-id="{{ client.id }}"
+           class="notes-client-link">
             <span class="notes-client-link-name">
                 {{ client.client_name }}
             </span>
@@ -321,26 +335,25 @@
 
     </div>
 
-    <!-- ── Notes List ───────────────────────────────── -->
-    <div>
+        <!-- ── Notes List ───────────────────────────────── -->
+    <div id="notes-list">
 
-        {% if search_query %}
-        <div class="results-info">
-            {{ notes|length }}
-            result{{ "s" if notes|length != 1 else "" }}
-            for "<strong>{{ search_query }}</strong>"
-            &nbsp;
-            <a href="{{ url_for('main.notes') }}{% if selected_client %}?client={{ selected_client }}{% endif %}"
-               style="color:var(--error);font-size:0.75rem">
-                Clear ×
-            </a>
+        <div class="empty-state" id="no-results-state" style="display:none;">
+            <div class="empty-icon">📝</div>
+            <div class="empty-title">No notes for this client yet</div>
+            <div class="empty-sub">
+                Click Add Note to document your first meeting with this client.
+            </div>
+            <button
+                onclick="openAddNoteForClient()"
+                class="btn btn-primary">
+                + Add First Note
+            </button>
         </div>
-        {% endif %}
 
         {% if notes %}
-
             {% for note in notes %}
-            <div class="note-card">
+            <div class="note-card" data-client-id="{{ note.client_id }}">
 
                 <div class="note-client-tag">
                     {{ (note.clients or {}).get('client_name', 'Unknown Client') }}
@@ -393,30 +406,15 @@
 
             <div class="empty-state">
                 <div class="empty-icon">📝</div>
-                <div class="empty-title">
-                    {% if search_query %}
-                        No notes match your search
-                    {% elif selected_client %}
-                        No notes for this client yet
-                    {% else %}
-                        No notes yet
-                    {% endif %}
-                </div>
+                <div class="empty-title">No notes yet</div>
                 <div class="empty-sub">
-                    {% if search_query %}
-                        Try a different search term.
-                    {% else %}
-                        Click Add Note to document your
-                        first client meeting.
-                    {% endif %}
+                    Click Add Note to document your first client meeting.
                 </div>
-                {% if not search_query %}
                 <button
                     onclick="document.getElementById('add-note-modal').style.display='flex'"
                     class="btn btn-primary">
                     + Add First Note
                 </button>
-                {% endif %}
             </div>
 
         {% endif %}
@@ -443,8 +441,7 @@
                 <select name="client_id" class="form-select" required>
                     <option value="">Select a client...</option>
                     {% for client in clients %}
-                    <option value="{{ client.id }}"
-                        {{ "selected" if selected_client == client.id }}>
+                    <option value="{{ client.id }}">
                         {{ client.client_name }}
                     </option>
                     {% endfor %}
@@ -533,19 +530,70 @@
 
 {% block extra_js %}
 <script>
-// Auto-submit search after typing stops
+// ── Client-side search and filter ─────────────────────────
 const searchInput = document.getElementById('notes-search');
-if (searchInput) {
-    let searchTimer;
-    searchInput.addEventListener('input', function() {
-        clearTimeout(searchTimer);
-        searchTimer = setTimeout(function() {
-            document.getElementById('search-submit').click();
-        }, 400);
+const clientLinks = document.querySelectorAll('.notes-client-link');
+let activeClientId = '';
+
+function filterNotes() {
+    const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+    const noteCards = document.querySelectorAll('.note-card');
+    const noResultsState = document.getElementById('no-results-state');
+    let visibleCount = 0;
+
+    noteCards.forEach(function(card) {
+        const subject = card.querySelector('.note-subject')
+            ? card.querySelector('.note-subject').textContent.toLowerCase()
+            : '';
+        const body = card.querySelector('.note-body')
+            ? card.querySelector('.note-body').textContent.toLowerCase()
+            : '';
+        const client = card.querySelector('.note-client-tag')
+            ? card.querySelector('.note-client-tag').textContent.toLowerCase().trim()
+            : '';
+        const cardClientId = card.getAttribute('data-client-id') || '';
+
+        const matchesSearch = query === '' || subject.includes(query) || body.includes(query) || client.includes(query);
+        const matchesClient = query !== '' || activeClientId === '' || cardClientId === activeClientId;
+
+        if (matchesSearch && matchesClient) {
+            card.style.display = '';
+            visibleCount++;
+        } else {
+            card.style.display = 'none';
+        }
     });
+
+    // Show empty state if no notes visible and a client is selected
+    if (noResultsState) {
+        if (visibleCount === 0 && activeClientId !== '') {
+            noResultsState.style.display = 'block';
+        } else {
+            noResultsState.style.display = 'none';
+        }
+    }
+}
+// Search input handler
+if (searchInput) {
+    searchInput.addEventListener('input', filterNotes);
 }
 
-// Open edit modal with note data
+// Client filter handler
+clientLinks.forEach(function(link) {
+    link.addEventListener('click', function(e) {
+        e.preventDefault();
+
+        clientLinks.forEach(function(l) { l.classList.remove('active'); });
+        this.classList.add('active');
+
+        activeClientId = this.getAttribute('data-client-id') || '';
+
+        if (searchInput) searchInput.value = '';
+        filterNotes();
+    });
+});
+
+// ── Edit modal ─────────────────────────────────────────────
 function openEditModal(noteId, subject, body, meetingDate) {
     const form = document.getElementById('edit-note-form');
     form.action = '/notes/update/' + noteId;
