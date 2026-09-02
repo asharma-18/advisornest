@@ -266,20 +266,16 @@ def recommendations():
         flash("Please log in to continue.", "info")
         return redirect(url_for("main.login"))
 
-    advisor_id = session["advisor"]["user_id"]
-    all_recs   = get_all_recommendations(advisor_id)
-    all_clients = get_all_clients(advisor_id)
-    selected_client = request.args.get("client", "")
-
-    if selected_client:
-        all_recs = [r for r in all_recs
-                    if r.get("client_id") == selected_client]
+    advisor_id      = session["advisor"]["user_id"]
+    all_recs        = get_all_recommendations(advisor_id)
+    all_clients     = get_all_clients(advisor_id)
 
     return render_template("recommendations/list.html",
         advisor=session.get("advisor"),
         recommendations=all_recs,
+        all_recs=all_recs,
         clients=all_clients,
-        selected_client=selected_client)
+        selected_client="")
 
 
 # ── View Recommendation ───────────────────────────────────

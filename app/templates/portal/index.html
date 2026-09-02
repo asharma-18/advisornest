@@ -558,6 +558,87 @@
         color: var(--text-muted) !important;
         font-style: italic !important;
     }
+    @media (max-width: 768px) {
+
+        /* ── Portal layout ── */
+        .portal-layout {
+            grid-template-columns: 1fr !important;
+        }
+
+        .portal-sidebar {
+            position: relative !important;
+            top: 0 !important;
+        }
+
+        /* ── Risk options ── */
+        .risk-options {
+            grid-template-columns: 1fr 1fr 1fr !important;
+        }
+
+        /* ── AI options grid ── */
+        .ai-options-grid {
+            grid-template-columns: 1fr !important;
+        }
+
+        /* ── Allocation slider ── */
+        .alloc-slider-row {
+            grid-template-columns: 90px 1fr 45px !important;
+            gap: 8px !important;
+        }
+
+        /* ── Client summary stats ── */
+        .stat-card {
+            padding: 12px !important;
+        }
+
+        .stat-value {
+            font-size: 1rem !important;
+        }
+
+        /* ── Instrument tabs ── */
+        .instr-tabs {
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+        }
+
+        .instr-tab {
+            flex-shrink: 0 !important;
+            font-size: 0.7rem !important;
+            padding: 6px 10px !important;
+        }
+
+        /* ── Option card ── */
+        .ai-option-card {
+            padding: 16px !important;
+        }
+
+        /* ── Allocation bar labels ── */
+        .ai-option-bar-label {
+            width: 70px !important;
+            font-size: 0.65rem !important;
+        }
+
+        /* ── Save and action buttons ── */
+        .portal-actions {
+            flex-direction: column !important;
+            gap: 10px !important;
+        }
+
+        .portal-actions .btn {
+            width: 100% !important;
+            text-align: center !important;
+        }
+
+        /* ── Customize panel ── */
+        .customize-panel {
+            padding: 16px !important;
+        }
+
+        /* ── Form two column ── */
+        .form-two-col {
+            grid-template-columns: 1fr !important;
+        }
+    }
 </style>
 {% endblock %}
 
@@ -1171,12 +1252,11 @@
 <!-- Full screen loading overlay -->
 <div id="loading-overlay"
      style="display:none;position:fixed;inset:0;
-            background:rgba(26,26,46,0.85);
+            background:rgba(26,26,46,0.92);
             z-index:9999;
             flex-direction:column;
             align-items:center;
-            justify-content:center;
-            backdrop-filter:blur(4px)">
+            justify-content:center">
     <div style="background:white;border-radius:16px;
                 padding:40px 48px;text-align:center;
                 max-width:420px;width:90%;
@@ -1193,12 +1273,23 @@
              id="loading-sub">
             Age, risk, horizon, life stage
         </div>
-        <div style="height:4px;background:var(--border);
-                    border-radius:4px;overflow:hidden;margin-bottom:20px">
-            <div id="loading-bar"
-                 style="height:100%;width:0%;background:var(--navy);
-                        border-radius:4px;transition:width 0.6s ease">
-            </div>
+        <div style="margin-bottom:20px">
+            <style>
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+                .loading-spinner {
+                    width: 48px;
+                    height: 48px;
+                    border: 4px solid var(--border);
+                    border-top: 4px solid var(--navy);
+                    border-radius: 50%;
+                    animation: spin 1s linear infinite;
+                    margin: 0 auto;
+                }
+            </style>
+            <div class="loading-spinner"></div>
         </div>
         <div style="font-size:0.75rem;color:var(--text-muted)">
             This usually takes 10-15 seconds
@@ -1286,6 +1377,13 @@ function submitPortalForm() {
     let step = 0;
     let dotCount = 0;
 
+    // Start bar animation immediately
+    requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+            if (bar) bar.style.width = '5%';
+        });
+    });
+
     setInterval(function() {
         if (step < messages.length) {
             if (sub) sub.textContent = messages[step][1];
@@ -1304,11 +1402,11 @@ function submitPortalForm() {
         }
     }, 400);
 
+    // Give overlay 500ms to render before submitting
     setTimeout(function() {
         document.getElementById('portal-form').submit();
-    }, 100);
+    }, 500);
 }
-
 function selectOption(optionId) {
     document.querySelectorAll('.ai-option-card').forEach(function(card) {
         card.classList.remove('selected');

@@ -184,6 +184,34 @@
         color: var(--text-secondary);
         margin-bottom: 6px;
     }
+
+    @media (max-width: 768px) {
+        .rec-layout {
+            grid-template-columns: 1fr !important;
+        }
+
+        .rec-sidebar {
+            position: relative !important;
+            top: 0 !important;
+        }
+
+        .rec-details {
+            grid-template-columns: 1fr 1fr !important;
+        }
+
+        .rec-card {
+            padding: 14px 16px !important;
+        }
+
+        .rec-actions {
+            flex-wrap: wrap !important;
+        }
+
+        .rec-actions .btn {
+            width: 100% !important;
+            text-align: center !important;
+        }
+    }
 </style>
 {% endblock %}
 
@@ -207,13 +235,26 @@
 
 <div class="rec-layout">
 
-    <!-- Sidebar -->
+    <!-- ── Sidebar ─────────────────────────────────────── -->
     <div class="rec-sidebar">
+
+        <div style="padding:10px;border-bottom:1px solid var(--border)">
+            <input
+                type="text"
+                id="rec-search"
+                placeholder="Search recommendations..."
+                autocomplete="off"
+                style="width:100%;height:34px;background:var(--bg-primary);
+                       border:1.5px solid var(--border);border-radius:6px;
+                       padding:0 10px;font-size:0.8rem;
+                       font-family:var(--font-body);color:var(--text-primary);
+                       outline:none;box-sizing:border-box">
+        </div>
+
         <div class="rec-sidebar-label">Filter by Client</div>
 
-        <a href="{{ url_for('main.recommendations') }}"
-           class="rec-client-link
-           {% if not selected_client %}active{% endif %}">
+        <a href="#" data-client-id=""
+           class="rec-client-link active">
             <span class="rec-client-name">All Clients</span>
             <span class="rec-count-badge">
                 {{ recommendations|length }}
@@ -221,9 +262,8 @@
         </a>
 
         {% for client in clients %}
-        <a href="{{ url_for('main.recommendations') }}?client={{ client.id }}"
-           class="rec-client-link
-           {% if selected_client == client.id %}active{% endif %}">
+        <a href="#" data-client-id="{{ client.id }}"
+           class="rec-client-link">
             <span class="rec-client-name">{{ client.client_name }}</span>
             <span class="rec-count-badge">
                 {{ recommendations | selectattr('client_id', 'equalto', client.id) | list | length }}
@@ -232,11 +272,26 @@
         {% endfor %}
     </div>
 
-    <!-- Recommendations list -->
-    <div>
+    <!-- ── Recommendations List ────────────────────────── -->
+    <div id="rec-list">
+
+        <div class="empty-state" id="rec-no-results"
+             style="display:none;">
+            <div class="empty-icon">📊</div>
+            <div class="empty-title">No recommendations for this client</div>
+            <p style="font-size:0.825rem;color:var(--text-muted);
+                      margin-bottom:20px">
+                Generate a recommendation for this client first.
+            </p>
+            <a href="{{ url_for('main.portal') }}"
+               class="btn btn-primary">
+                Generate Recommendation
+            </a>
+        </div>
+
         {% if recommendations %}
             {% for rec in recommendations %}
-            <div class="rec-card">
+            <div class="rec-card" data-client-id="{{ rec.client_id }}">
                 <div class="rec-card-header">
                     <div>
                         <div class="rec-client-tag">
@@ -286,7 +341,6 @@
                     </div>
                 </div>
 
-                <!-- Allocation bars -->
                 {% if rec.allocation %}
                 <div class="rec-alloc-bars">
                     {% set alloc_colors = {
@@ -360,4 +414,88 @@
 </div>
 {% endif %}
 
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── Client-side filter and search ─────────────────────────
+const recClientLinks = document.querySelectorAll('.rec-client-link');
+const recSearchInput = document.getElementById('rec-search');
+let activeRecClientId = '';
+
+function filterRecs() {
+    const recCards = document.querySelectorAll('.rec-card');
+    const noResults = document.getElementById('rec-no-results');
+    const query = recSearchInput ? recSearchInput.value.toLowerCase().trim() : '';
+    let visibleCount = 0;
+
+    recCards.forEach(function(card) {
+        const cardClientId = card.getAttribute('data-client-id') || '';
+        const clientTag = card.querySelector('.rec-client-tag')
+            ? card.querySelector('.rec-client-tag').textContent.toLowerCase().trim()
+            : '';
+
+        // If search active — ignore client filter, search all
+        // If no search — apply client filter
+        let show = false;
+        if (query !== '') {
+            show = clientTag.includes(query);
+        } else {
+            show = activeRecClientId === '' || cardClientId === activeRecClientId;
+        }
+
+        if (show) {
+            card.style.display = '';
+            visibleCount++;
+        } else {
+            card.style.display = 'none';
+        }
+    });
+
+    // Filter sidebar links when search active
+    recClientLinks.forEach(function(link) {
+        const clientName = link.querySelector('.rec-client-name')
+            ? link.querySelector('.rec-client-name').textContent.toLowerCase().trim()
+            : '';
+        const isAllClients = link.getAttribute('data-client-id') === '';
+
+        if (query === '' || isAllClients || clientName.includes(query)) {
+            link.style.display = '';
+        } else {
+            link.style.display = 'none';
+        }
+    });
+
+    if (noResults) {
+        noResults.style.display = (visibleCount === 0 && (activeRecClientId !== '' || query !== '')) ? 'block' : 'none';
+    }
+}
+
+// Client filter handler
+recClientLinks.forEach(function(link) {
+    link.addEventListener('click', function(e) {
+        e.preventDefault();
+        recClientLinks.forEach(function(l) { l.classList.remove('active'); });
+        this.classList.add('active');
+        activeRecClientId = this.getAttribute('data-client-id') || '';
+        if (recSearchInput) recSearchInput.value = '';
+        recClientLinks.forEach(function(l) { l.style.display = ''; });
+        filterRecs();
+    });
+});
+
+// Search handler
+if (recSearchInput) {
+    recSearchInput.addEventListener('input', function() {
+        // When searching reset client filter
+        if (this.value.trim() !== '') {
+            activeRecClientId = '';
+            recClientLinks.forEach(function(l) { l.classList.remove('active'); });
+            const allLink = document.querySelector('.rec-client-link[data-client-id=""]');
+            if (allLink) allLink.classList.add('active');
+        }
+        filterRecs();
+    });
+}
+</script>
 {% endblock %}

@@ -173,6 +173,17 @@
 
     .info-label { color: var(--text-muted); }
     .info-value { font-weight: 600; color: var(--text-primary); }
+
+    @media (max-width: 768px) {
+        .view-layout {
+            grid-template-columns: 1fr !important;
+        }
+
+        .view-sidebar {
+            position: relative !important;
+            top: 0 !important;
+        }
+    }
 </style>
 {% endblock %}
 

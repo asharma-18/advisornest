@@ -1259,4 +1259,8 @@ tr:hover td {
     .action-card {
         padding: 16px !important;
     }
+        /* ── Settings page ── */
+    .settings-two-col {
+        grid-template-columns: 1fr !important;
+    }
 }
