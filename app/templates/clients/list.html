@@ -17,6 +17,23 @@
     </a>
 </div>
 
+<!-- ── Search Bar ──────────────────────────────────────── -->
+{% if clients %}
+<div style="margin-bottom:20px">
+    <input
+        type="text"
+        id="client-search"
+        placeholder="Search clients by name, risk, life stage..."
+        autocomplete="off"
+        style="width:100%;height:42px;background:white;
+               border:1.5px solid var(--border);border-radius:8px;
+               padding:0 16px;font-size:0.875rem;
+               font-family:var(--font-body);color:var(--text-primary);
+               outline:none;box-sizing:border-box;
+               transition:border-color 0.2s">
+</div>
+{% endif %}
+
 {% if clients %}
 
 <!-- ── Clients Table ──────────────────────────────────── -->
@@ -114,4 +131,29 @@
 
 {% endif %}
 
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const clientSearch = document.getElementById('client-search');
+if (clientSearch) {
+    clientSearch.addEventListener('input', function() {
+        const query = this.value.toLowerCase().trim();
+        const rows = document.querySelectorAll('tbody tr');
+
+        rows.forEach(function(row) {
+            const text = row.textContent.toLowerCase();
+            row.style.display = query === '' || text.includes(query) ? '' : 'none';
+        });
+    });
+
+    clientSearch.addEventListener('focus', function() {
+        this.style.borderColor = 'var(--navy)';
+    });
+
+    clientSearch.addEventListener('blur', function() {
+        this.style.borderColor = 'var(--border)';
+    });
+}
+</script>
 {% endblock %}

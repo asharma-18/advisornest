@@ -563,7 +563,19 @@ function filterNotes() {
             card.style.display = 'none';
         }
     });
+    // Filter client sidebar links when search is active
+    clientLinks.forEach(function(link) {
+        const clientName = link.querySelector('.notes-client-link-name')
+            ? link.querySelector('.notes-client-link-name').textContent.toLowerCase().trim()
+            : '';
+        const isAllClients = link.getAttribute('data-client-id') === '';
 
+        if (query === '' || isAllClients || clientName.includes(query)) {
+            link.style.display = '';
+        } else {
+            link.style.display = 'none';
+        }
+    });
     // Show empty state if no notes visible and a client is selected
     if (noResultsState) {
         if (visibleCount === 0 && activeClientId !== '') {
