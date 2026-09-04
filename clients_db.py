@@ -11,14 +11,20 @@ load_dotenv()
 
 # Use service role key for database operations
 # This bypasses RLS — keep this key secret
-supabase = create_client(
-    os.getenv("SUPABASE_URL"),
-    os.getenv("SUPABASE_SERVICE_KEY")
-)
+_supabase = None
+
+def get_supabase():
+    global _supabase
+    if _supabase is None:
+        _supabase = create_client(
+            os.getenv("SUPABASE_URL"),
+            os.getenv("SUPABASE_SERVICE_KEY")
+        )
+    return _supabase
 
 def save_client(advisor_id, client_data):
     try:
-        result = supabase.table("clients").insert({
+        result = get_supabase().table("clients").insert({
             "advisor_id":       advisor_id,
             "client_name":      client_data["client_name"],
             "age":              client_data["age"],
@@ -59,7 +65,7 @@ def get_all_clients(advisor_id):
     Returns a list of client records ordered by most recent first.
     """
     try:
-        result = supabase.table("clients")\
+        result = get_supabase().table("clients")\
             .select("*")\
             .eq("advisor_id", advisor_id)\
             .order("created_at", desc=True)\
@@ -78,7 +84,7 @@ def get_client(client_id, advisor_id):
     owns this client — security check.
     """
     try:
-        result = supabase.table("clients")\
+        result = get_supabase().table("clients")\
             .select("*")\
             .eq("id", client_id)\
             .eq("advisor_id", advisor_id)\
@@ -99,7 +105,7 @@ def delete_client(client_id, advisor_id):
     delete their own clients.
     """
     try:
-        supabase.table("clients")\
+        get_supabase().table("clients")\
             .delete()\
             .eq("id", client_id)\
             .eq("advisor_id", advisor_id)\
@@ -123,7 +129,7 @@ def get_client_count(advisor_id):
     by this advisor. Used on the dashboard.
     """
     try:
-        result = supabase.table("clients")\
+        result = get_supabase().table("clients")\
             .select("id", count="exact")\
             .eq("advisor_id", advisor_id)\
             .execute()

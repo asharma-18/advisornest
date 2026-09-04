@@ -5,15 +5,21 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Create Supabase client
-supabase = create_client(
-    os.getenv("SUPABASE_URL"),
-    os.getenv("SUPABASE_KEY")
-)
+_supabase = None
+
+def get_supabase():
+    global _supabase
+    if _supabase is None:
+        _supabase = create_client(
+            os.getenv("SUPABASE_URL"),
+            os.getenv("SUPABASE_KEY")
+        )
+    return _supabase
 
 
 def register_advisor(email, password, full_name, firm_name):
     try:
-        auth_response = supabase.auth.sign_up({
+        auth_response = get_supabase().auth.sign_up({
             "email": email,
             "password": password
         })
@@ -27,7 +33,7 @@ def register_advisor(email, password, full_name, firm_name):
         user_id = auth_response.user.id
 
         from datetime import datetime, timezone
-        supabase.table("advisors").insert({
+        get_supabase().table("advisors").insert({
             "id":               user_id,
             "full_name":        full_name,
             "firm_name":        firm_name,
@@ -54,7 +60,7 @@ def register_advisor(email, password, full_name, firm_name):
 
 def login_advisor(email, password):
     try:
-        auth_response = supabase.auth.sign_in_with_password({
+        auth_response = get_supabase().auth.sign_in_with_password({
             "email": email,
             "password": password
         })
@@ -67,7 +73,7 @@ def login_advisor(email, password):
 
         user_id = auth_response.user.id
 
-        profile = supabase.table("advisors")\
+        profile = get_supabase().table("advisors")\
             .select("*")\
             .eq("id", user_id)\
             .execute()
@@ -104,7 +110,7 @@ def get_google_auth_url():
     clicks to sign in with Google.
     """
     try:
-        response = supabase.auth.sign_in_with_oauth({
+        response = get_supabase().auth.sign_in_with_oauth({
             "provider": "google",
             "options": {
                 "redirect_to": os.getenv("GOOGLE_REDIRECT_URI",

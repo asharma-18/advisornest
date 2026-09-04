@@ -8,11 +8,16 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-supabase = create_client(
-    os.getenv("SUPABASE_URL"),
-    os.getenv("SUPABASE_SERVICE_KEY")
-)
+_supabase = None
 
+def get_supabase():
+    global _supabase
+    if _supabase is None:
+        _supabase = create_client(
+            os.getenv("SUPABASE_URL"),
+            os.getenv("SUPABASE_SERVICE_KEY")
+        )
+    return _supabase
 
 def save_recommendation(advisor_id, client_id, rec_data):
     """
@@ -20,7 +25,7 @@ def save_recommendation(advisor_id, client_id, rec_data):
     Called when advisor saves a client profile.
     """
     try:
-        result = supabase.table("recommendations").insert({
+        result = get_supabase().table("recommendations").insert({
             "advisor_id":      advisor_id,
             "client_id":       client_id,
             "client_name":     rec_data.get("client_name", ""),
@@ -51,7 +56,7 @@ def get_all_recommendations(advisor_id):
     Ordered by most recent first.
     """
     try:
-        result = supabase.table("recommendations")\
+        result = get_supabase().table("recommendations")\
             .select("*")\
             .eq("advisor_id", advisor_id)\
             .order("created_at", desc=True)\
@@ -67,7 +72,7 @@ def get_client_recommendations(advisor_id, client_id):
     Gets all recommendations for a specific client.
     """
     try:
-        result = supabase.table("recommendations")\
+        result = get_supabase().table("recommendations")\
             .select("*")\
             .eq("advisor_id", advisor_id)\
             .eq("client_id", client_id)\
@@ -84,7 +89,7 @@ def get_recommendation(advisor_id, rec_id):
     Gets a single recommendation by ID.
     """
     try:
-        result = supabase.table("recommendations")\
+        result = get_supabase().table("recommendations")\
             .select("*")\
             .eq("advisor_id", advisor_id)\
             .eq("id", rec_id)\
@@ -102,7 +107,7 @@ def delete_recommendation(advisor_id, rec_id):
     Deletes a recommendation.
     """
     try:
-        supabase.table("recommendations")\
+        get_supabase().table("recommendations")\
             .delete()\
             .eq("advisor_id", advisor_id)\
             .eq("id", rec_id)\
@@ -118,7 +123,7 @@ def get_recommendation_count(advisor_id):
     Returns total recommendation count for this advisor.
     """
     try:
-        result = supabase.table("recommendations")\
+        result = get_supabase().table("recommendations")\
             .select("id", count="exact")\
             .eq("advisor_id", advisor_id)\
             .execute()

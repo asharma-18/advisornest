@@ -7,10 +7,16 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-supabase = create_client(
-    os.getenv("SUPABASE_URL"),
-    os.getenv("SUPABASE_SERVICE_KEY")
-)
+_supabase = None
+
+def get_supabase():
+    global _supabase
+    if _supabase is None:
+        _supabase = create_client(
+            os.getenv("SUPABASE_URL"),
+            os.getenv("SUPABASE_SERVICE_KEY")
+        )
+    return _supabase
 
 
 def get_all_notes(advisor_id):
@@ -19,7 +25,7 @@ def get_all_notes(advisor_id):
     Ordered by most recent first.
     """
     try:
-        result = supabase.table("notes")\
+        result = get_supabase().table("notes")\
             .select("*, clients(client_name)")\
             .eq("advisor_id", advisor_id)\
             .order("created_at", desc=True)\
@@ -32,7 +38,7 @@ def get_all_notes(advisor_id):
 
 def get_client_notes(advisor_id, client_id):
     try:
-        result = supabase.table("notes")\
+        result = get_supabase().table("notes")\
             .select("*, clients(client_name)")\
             .eq("advisor_id", advisor_id)\
             .eq("client_id", client_id)\
@@ -58,7 +64,7 @@ def add_note(advisor_id, client_id, subject, body, meeting_date):
         if meeting_date:
             data["meeting_date"] = meeting_date
 
-        result = supabase.table("notes")\
+        result = get_supabase().table("notes")\
             .insert(data)\
             .execute()
 
@@ -75,7 +81,7 @@ def delete_note(note_id, advisor_id):
     Deletes a note. Checks advisor_id for security.
     """
     try:
-        supabase.table("notes")\
+        get_supabase().table("notes")\
             .delete()\
             .eq("id", note_id)\
             .eq("advisor_id", advisor_id)\
@@ -92,7 +98,7 @@ def get_note_count(advisor_id):
     Used on the dashboard.
     """
     try:
-        result = supabase.table("notes")\
+        result = get_supabase().table("notes")\
             .select("id", count="exact")\
             .eq("advisor_id", advisor_id)\
             .execute()
@@ -114,7 +120,7 @@ def update_note(note_id, advisor_id, subject, body, meeting_date):
         if meeting_date:
             data["meeting_date"] = meeting_date
 
-        result = supabase.table("notes")\
+        result = get_supabase().table("notes")\
             .update(data)\
             .eq("id", note_id)\
             .eq("advisor_id", advisor_id)\

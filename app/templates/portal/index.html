@@ -1274,6 +1274,18 @@
             Age, risk, horizon, life stage
         </div>
         <div style="margin-bottom:20px">
+         <!-- Progress bar for desktop -->
+        <div class="desktop-loading-bar" style="height:4px;background:var(--border);
+                    border-radius:4px;overflow:hidden">
+            <div id="loading-bar"
+                 style="height:100%;width:0%;background:var(--navy);
+                        border-radius:4px;transition:width 0.6s ease;
+                        -webkit-transition:width 0.6s ease">
+            </div>
+        </div>
+
+        <!-- Spinner for mobile -->
+        <div class="mobile-loading-spinner" style="display:none">
             <style>
                 @keyframes spin {
                     0% { transform: rotate(0deg); }
@@ -1290,6 +1302,14 @@
                 }
             </style>
             <div class="loading-spinner"></div>
+        </div>
+
+        <style>
+            @media (max-width: 768px) {
+                .desktop-loading-bar { display: none !important; }
+                .mobile-loading-spinner { display: block !important; }
+            }
+        </style>
         </div>
         <div style="font-size:0.75rem;color:var(--text-muted)">
             This usually takes 10-15 seconds
