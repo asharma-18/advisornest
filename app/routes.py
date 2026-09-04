@@ -863,8 +863,14 @@ def generate_suitability_note_route():
 def terms():
     return render_template("legal/terms.html")
 
-
 # ── Privacy Policy ────────────────────────────────────────
 @main.route("/privacy")
 def privacy():
     return render_template("legal/privacy.html")
+
+@main.route("/env-test")
+def env_test():
+    import os
+    supabase_url = os.environ.get("SUPABASE_URL", "NOT FOUND")
+    supabase_key = os.environ.get("SUPABASE_KEY", "NOT FOUND")
+    return f"URL present: {supabase_url != 'NOT FOUND'} | KEY present: {supabase_key != 'NOT FOUND'} | URL starts with: {supabase_url[:15]}"
