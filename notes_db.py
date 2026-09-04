@@ -12,10 +12,13 @@ _supabase = None
 def get_supabase():
     global _supabase
     if _supabase is None:
-        _supabase = create_client(
-            os.getenv("SUPABASE_URL"),
-            os.getenv("SUPABASE_SERVICE_KEY")
-        )
+        url = os.environ.get("SUPABASE_URL")
+        key = os.environ.get("SUPABASE_KEY")
+        print(f"Supabase URL present: {bool(url)}")
+        print(f"Supabase KEY present: {bool(key)}")
+        if not url or not key:
+            raise Exception(f"Missing Supabase credentials. URL: {bool(url)}, KEY: {bool(key)}")
+        _supabase = create_client(url, key)
     return _supabase
 
 
