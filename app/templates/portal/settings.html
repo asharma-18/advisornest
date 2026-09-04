@@ -286,4 +286,26 @@
 
 </div>
 
+<!-- ── Mobile Logout ───────────────────────────────────── -->
+<div style="display:none" class="mobile-logout-wrap">
+    <a href="{{ url_for('main.logout') }}"
+       onclick="return confirm('Are you sure you want to log out?')"
+       class="btn"
+       style="width:100%;text-align:center;background:#fee2e2;
+              color:#c53030;border:1px solid #fecaca;
+              padding:14px;font-size:0.9rem;font-weight:600;
+              border-radius:10px;margin-top:16px;display:block">
+        🚪 Log Out
+    </a>
+</div>
+
+<style>
+    @media (max-width: 768px) {
+        .mobile-logout-wrap {
+            display: block !important;
+            margin-top: 24px;
+        }
+    }
+</style>
+
 {% endblock %}

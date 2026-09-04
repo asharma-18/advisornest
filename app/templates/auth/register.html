@@ -23,10 +23,10 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        height: 56px;
+        height: 68px;
         flex-shrink: 0;
     }
-
+    
     .auth-nav-logo {
         font-family: var(--font-heading);
         font-size: 1.3rem;
@@ -517,35 +517,43 @@
             transform: translateY(0);
         }
     }
-@media (max-width: 768px) {
-    .auth-body { 
-        grid-template-columns: 1fr 1fr !important;
-        font-size: 12px !important;
+    @media (max-width: 768px) {
+        .auth-body {
+            grid-template-columns: 1fr !important;
+        }
+        .auth-right {
+            display: none !important;
+        }
+        .auth-left {
+            padding: 20px !important;
+            min-height: 100vh !important;
+        }
+        .auth-card {
+            padding: 20px !important;
+        }
+        .auth-title {
+            font-size: 1.3rem !important;
+        }
+        .auth-field-input {
+            font-size: 16px !important;
+        }
+        .auth-nav {
+            padding: 0 16px !important;
+            height: 62px !important;
+        }
+        .auth-nav-logo {
+            font-size: 1.1rem !important;
+        }
+        .auth-nav-badge { 
+            font-size: 0.55rem !important; 
+            letter-spacing: 0.04em !important; 
+        }
+        .auth-nav-link {
+            padding: 6px 8px !important;
+            font-size: 0.7rem !important;
+        }
+        
     }
-    .auth-left {
-        padding: 16px !important;
-    }
-    .auth-right {
-        padding: 16px !important;
-    }
-    .auth-card {
-        padding: 16px !important;
-    }
-    .auth-title {
-        font-size: 1.1rem !important;
-    }
-    .auth-subtitle {
-        font-size: 0.75rem !important;
-    }
-    .auth-field-input {
-        padding: 8px 10px !important;
-        font-size: 12px !important;
-    }
-    .auth-btn {
-        padding: 10px !important;
-        font-size: 0.8rem !important;
-    }
-}
 </style>
 {% endblock %}
 
@@ -773,13 +781,15 @@
                     Create My AdvisorNest Account
                 </button>
             <div style="text-align:center;margin-top:20px;
-                     font-size:0.75rem;color:var(--text-muted)">
-                 By registering you agree to our
+                        font-size:0.75rem;color:var(--text-muted)">
+                By registering you agree to our
                 <a href="{{ url_for('main.terms') }}"
-                   style="color:var(--navy)">Terms of Service</a>
+                       target="_blank"
+                       style="color:var(--navy)">Terms of Service</a>
                 and
                 <a href="{{ url_for('main.privacy') }}"
-                   style="color:var(--navy)">Privacy Policy</a>
+                       target="_blank"
+                       style="color:var(--navy)">Privacy Policy</a>
             </div>
 
             </form>
