@@ -16,15 +16,10 @@ _supabase = None
 def get_supabase():
     global _supabase
     if _supabase is None:
-        url = os.environ.get("SUPABASE_URL")
-        key = os.environ.get("SUPABASE_KEY")
-        print(f"Supabase URL present: {bool(url)}")
-        print(f"Supabase KEY present: {bool(key)}")
-        if not url or not key:
-            raise Exception(f"Missing Supabase credentials. URL: {bool(url)}, KEY: {bool(key)}")
+        url = os.getenv("SUPABASE_URL")
+        key = os.getenv("SUPABASE_SERVICE_KEY")
         _supabase = create_client(url, key)
     return _supabase
-
 def save_client(advisor_id, client_data):
     try:
         result = get_supabase().table("clients").insert({
@@ -63,20 +58,17 @@ def save_client(advisor_id, client_data):
         }
 
 def get_all_clients(advisor_id):
-    """
-    Gets all clients saved by this advisor.
-    Returns a list of client records ordered by most recent first.
-    """
     try:
+        print(f"Fetching clients for advisor_id: {advisor_id}")
         result = get_supabase().table("clients")\
             .select("*")\
             .eq("advisor_id", advisor_id)\
             .order("created_at", desc=True)\
             .execute()
-
+        print(f"Clients result: {len(result.data) if result.data else 0}")
         return result.data if result.data else []
-
-    except Exception:
+    except Exception as e:
+        print(f"Error: {str(e)}")
         return []
 
 
