@@ -360,7 +360,8 @@ def register():
             flash("Passwords do not match.", "error")
             return redirect(url_for("main.register"))
 
-        result = register_advisor(email, password, full_name, firm_name)
+        license_number = request.form.get("license_number", "").strip()
+        result = register_advisor(email, password, full_name, firm_name, license_number)
 
         if result["success"]:
             flash("Account created! Please log in.", "success")

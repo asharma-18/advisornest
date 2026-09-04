@@ -4,20 +4,20 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Create Supabase client
 _supabase = None
 
 def get_supabase():
     global _supabase
     if _supabase is None:
-        _supabase = create_client(
-            os.getenv("SUPABASE_URL"),
-            os.getenv("SUPABASE_KEY")
-        )
+        url = os.getenv("SUPABASE_URL", "").strip()
+        key = os.getenv("SUPABASE_KEY", "").strip()
+        if not url or not key:
+            raise Exception(f"Missing Supabase credentials. URL: {bool(url)}, KEY: {bool(key)}")
+        _supabase = create_client(url, key)
     return _supabase
 
 
-def register_advisor(email, password, full_name, firm_name):
+def register_advisor(email, password, full_name, firm_name, license_number=""):
     try:
         auth_response = get_supabase().auth.sign_up({
             "email": email,
@@ -34,27 +34,29 @@ def register_advisor(email, password, full_name, firm_name):
 
         from datetime import datetime, timezone
         get_supabase().table("advisors").insert({
-            "id":               user_id,
-            "full_name":        full_name,
-            "firm_name":        firm_name,
-            "license_number":   "",
+            "id":                user_id,
+            "full_name":         full_name,
+            "firm_name":         firm_name,
+            "license_number":    license_number,
             "terms_accepted_at": datetime.now(timezone.utc).isoformat(),
         }).execute()
+
         return {
             "success": True,
             "message": "Account created successfully!"
         }
 
     except Exception as e:
-        error = str(e)
-        if "already registered" in error.lower():
+        error_msg = str(e)
+        print(f"Register error: {error_msg}")
+        if "already registered" in error_msg.lower():
             return {
                 "success": False,
                 "message": "An account with this email already exists."
             }
         return {
             "success": False,
-            "message": "Registration failed. Please try again."
+            "message": f"Registration failed: {error_msg}"
         }
 
 
@@ -78,38 +80,39 @@ def login_advisor(email, password):
             .eq("id", user_id)\
             .execute()
 
-        full_name = ""
-        firm_name = ""
+        full_name      = ""
+        firm_name      = ""
+        license_number = ""
+
         if profile.data and len(profile.data) > 0:
-            full_name = profile.data[0].get("full_name", "")
-            firm_name = profile.data[0].get("firm_name", "")
+            full_name      = profile.data[0].get("full_name", "")
+            firm_name      = profile.data[0].get("firm_name", "")
+            license_number = profile.data[0].get("license_number", "")
 
         return {
-            "success": True,
-            "user_id": user_id,
-            "email": email,
-            "full_name": full_name,
-            "firm_name": firm_name
+            "success":        True,
+            "user_id":        user_id,
+            "email":          email,
+            "full_name":      full_name,
+            "firm_name":      firm_name,
+            "license_number": license_number
         }
 
     except Exception as e:
-        error = str(e)
-        if "invalid" in error.lower() or "credentials" in error.lower():
+        error_msg = str(e)
+        print(f"Login error: {error_msg}")
+        if "invalid" in error_msg.lower() or "credentials" in error_msg.lower():
             return {
                 "success": False,
-                "message": "Invalid email or password."
+                "message": "Invalid email or password. Please try again."
             }
-    print(f"Login error: {str(e)}")
-    return {
+        return {
             "success": False,
-            "message": f"Login failed: {str(e)}"
+            "message": f"Login failed: {error_msg}"
         }
 
+
 def get_google_auth_url():
-    """
-    Generates the Google OAuth URL that the advisor
-    clicks to sign in with Google.
-    """
     try:
         response = get_supabase().auth.sign_in_with_oauth({
             "provider": "google",
