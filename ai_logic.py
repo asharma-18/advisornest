@@ -6,7 +6,13 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 load_dotenv()
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+_client = None
+
+def get_client():
+    global _client
+    if _client is None:
+        _client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    return _client
 
 # ── Option Definitions ────────────────────────────────────
 OPTION_DEFINITIONS = {
@@ -69,7 +75,6 @@ def generate_single_option(
     option_id, client_name, age, life_stage,
     risk, horizon, amount, market_data
 ):
-    """Generates a single portfolio option."""
     rates = market_data.get("rates", {})
     treasury_10y = rates.get("10_year_treasury", "N/A")
     treasury_1y  = rates.get("1_year_treasury", "N/A")
@@ -170,7 +175,7 @@ Replace example instruments with your actual picks from the approved lists.
 Return ONLY valid JSON. No markdown. No explanation."""
 
     try:
-        response = client.chat.completions.create(
+        response = get_client().chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {
@@ -210,9 +215,8 @@ Return ONLY valid JSON. No markdown. No explanation."""
 def generate_market_context(
     client_name, risk, treasury_10y, cd_1y
 ):
-    """Generates market context and advisor note separately."""
     try:
-        response = client.chat.completions.create(
+        response = get_client().chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {
@@ -248,10 +252,6 @@ def generate_ai_recommendation(
     client_name, age, life_stage, risk,
     horizon, amount, market_data
 ):
-    """
-    Generates 4 portfolio options in parallel using ThreadPoolExecutor.
-    Each option is generated simultaneously instead of sequentially.
-    """
     rates = market_data.get("rates", {})
     treasury_10y = rates.get("10_year_treasury", "N/A")
     cd_1y        = rates.get("cd_1_year", "N/A")
@@ -260,10 +260,8 @@ def generate_ai_recommendation(
     results = {}
 
     try:
-        # Run all 4 options + market context in parallel
         with ThreadPoolExecutor(max_workers=5) as executor:
 
-            # Submit all 4 option generation tasks simultaneously
             future_to_option = {
                 executor.submit(
                     generate_single_option,
@@ -274,13 +272,11 @@ def generate_ai_recommendation(
                 for option_id in option_ids
             }
 
-            # Also submit market context generation in parallel
             future_context = executor.submit(
                 generate_market_context,
                 client_name, risk, treasury_10y, cd_1y
             )
 
-            # Collect results as they complete
             for future in as_completed(future_to_option):
                 option_id = future_to_option[future]
                 try:
@@ -292,7 +288,6 @@ def generate_ai_recommendation(
                 except Exception as e:
                     print(f"Option {option_id} exception: {str(e)}")
 
-            # Get market context
             try:
                 context_data = future_context.result()
             except Exception:
@@ -301,12 +296,10 @@ def generate_ai_recommendation(
                     "advisor_note": "The licensed financial advisor makes the final investment decision."
                 }
 
-        # Check we got all 4 options
         if len(results) < 4:
             print(f"Only got {len(results)} options, using fallback")
             return {"success": False, "error": "Not all options generated"}
 
-        # Sort options A, B, C, D in order
         ordered_options = [results[oid] for oid in option_ids if oid in results]
 
         return {
@@ -427,7 +420,7 @@ Write in formal compliance language. Be specific. Reference actual tickers.
 Return ONLY the 4 paragraphs of text. No JSON. No headers. Just the paragraphs separated by blank lines."""
 
     try:
-        response = client.chat.completions.create(
+        response = get_client().chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {
