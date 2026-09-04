@@ -37,7 +37,7 @@ def register_advisor(email, password, full_name, firm_name):
             "id":               user_id,
             "full_name":        full_name,
             "firm_name":        firm_name,
-            "license_number":   request.form.get("license_number", ""),
+            "license_number":   "",
             "terms_accepted_at": datetime.now(timezone.utc).isoformat(),
         }).execute()
         return {
@@ -99,9 +99,10 @@ def login_advisor(email, password):
                 "success": False,
                 "message": "Invalid email or password."
             }
-        return {
+    print(f"Login error: {str(e)}")
+    return {
             "success": False,
-            "message": "Login failed. Please try again."
+            "message": f"Login failed: {str(e)}"
         }
 
 def get_google_auth_url():
