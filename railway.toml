@@ -1,0 +1,5 @@
+[deploy]
+startCommand = "gunicorn run:app"
+
+[build]
+builder = "nixpacks"
