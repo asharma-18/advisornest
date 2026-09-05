@@ -10,7 +10,9 @@ def get_supabase():
     global _supabase
     if _supabase is None:
         url = os.getenv("SUPABASE_URL")
-        key = os.getenv("SUPABASE_SERVICE_KEY")
+        key = os.getenv("SUPABASE_KEY")
+        if not url or not key:
+            raise Exception(f"Missing Supabase credentials. URL: {bool(url)}, KEY: {bool(key)}")
         _supabase = create_client(url, key)
     return _supabase
 
@@ -115,11 +117,16 @@ def get_google_auth_url():
         response = get_supabase().auth.sign_in_with_oauth({
             "provider": "google",
             "options": {
-                "redirect_to": os.environ.get("GOOGLE_REDIRECT_URI",
-                    "http://127.0.0.1:5000/auth/google/callback")
+                "redirect_to": "http://127.0.0.1:5000/auth/google/callback",
+                "scopes": "email profile"
             }
         })
-        return response.url
+        # Append prompt=select_account to force account picker
+        url = response.url
+        if url and "prompt" not in url:
+            separator = "&" if "?" in url else "?"
+            url = url + separator + "prompt=select_account"
+        return url
     except Exception as e:
         print(f"Google auth error: {str(e)}")
         return None
