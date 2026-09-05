@@ -166,12 +166,6 @@
         gap: 8px;
     }
 
-    .results-info {
-        font-size: 0.8rem;
-        color: var(--text-muted);
-        margin-bottom: 14px;
-    }
-
     .empty-state {
         text-align: center;
         padding: 48px 20px;
@@ -335,9 +329,10 @@
 
     </div>
 
-        <!-- ── Notes List ───────────────────────────────── -->
+    <!-- ── Notes List ───────────────────────────────── -->
     <div id="notes-list">
 
+        <!-- Empty state for client with no notes -->
         <div class="empty-state" id="no-results-state" style="display:none;">
             <div class="empty-icon">📝</div>
             <div class="empty-title">No notes for this client yet</div>
@@ -404,7 +399,8 @@
 
         {% else %}
 
-            <div class="empty-state">
+            <!-- Static empty state when no notes exist at all -->
+            <div class="empty-state" id="static-empty-state">
                 <div class="empty-icon">📝</div>
                 <div class="empty-title">No notes yet</div>
                 <div class="empty-sub">
@@ -538,7 +534,8 @@ let activeClientId = '';
 function filterNotes() {
     const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
     const noteCards = document.querySelectorAll('.note-card');
-    const noResultsState = document.getElementById('no-results-state');
+    const noResultsState  = document.getElementById('no-results-state');
+    const staticEmptyState = document.getElementById('static-empty-state');
     let visibleCount = 0;
 
     noteCards.forEach(function(card) {
@@ -563,7 +560,26 @@ function filterNotes() {
             card.style.display = 'none';
         }
     });
-    // Filter client sidebar links when search is active
+
+    // Show client empty state only when a specific client is selected and has no notes
+    if (noResultsState) {
+        if (visibleCount === 0 && activeClientId !== '') {
+            noResultsState.style.display = 'block';
+        } else {
+            noResultsState.style.display = 'none';
+        }
+    }
+
+    // Hide static empty state when a specific client is selected
+    if (staticEmptyState) {
+        if (activeClientId !== '') {
+            staticEmptyState.style.display = 'none';
+        } else {
+            staticEmptyState.style.display = 'block';
+        }
+    }
+
+    // Filter sidebar client links when search is active
     clientLinks.forEach(function(link) {
         const clientName = link.querySelector('.notes-client-link-name')
             ? link.querySelector('.notes-client-link-name').textContent.toLowerCase().trim()
@@ -576,15 +592,8 @@ function filterNotes() {
             link.style.display = 'none';
         }
     });
-    // Show empty state if no notes visible and a client is selected
-    if (noResultsState) {
-        if (visibleCount === 0 && activeClientId !== '') {
-            noResultsState.style.display = 'block';
-        } else {
-            noResultsState.style.display = 'none';
-        }
-    }
 }
+
 // Search input handler
 if (searchInput) {
     searchInput.addEventListener('input', filterNotes);
@@ -594,16 +603,24 @@ if (searchInput) {
 clientLinks.forEach(function(link) {
     link.addEventListener('click', function(e) {
         e.preventDefault();
-
         clientLinks.forEach(function(l) { l.classList.remove('active'); });
         this.classList.add('active');
-
         activeClientId = this.getAttribute('data-client-id') || '';
-
         if (searchInput) searchInput.value = '';
+        clientLinks.forEach(function(l) { l.style.display = ''; });
         filterNotes();
     });
 });
+
+// ── Open add note modal with client pre-selected ──────────
+function openAddNoteForClient() {
+    const modal  = document.getElementById('add-note-modal');
+    const select = modal.querySelector('select[name="client_id"]');
+    if (select && activeClientId) {
+        select.value = activeClientId;
+    }
+    modal.style.display = 'flex';
+}
 
 // ── Edit modal ─────────────────────────────────────────────
 function openEditModal(noteId, subject, body, meetingDate) {
