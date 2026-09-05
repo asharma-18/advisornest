@@ -20,6 +20,13 @@ MUTED    = HexColor("#8892a4")
 WHITE    = white
 
 
+def safe(value, default=""):
+    """Return value if not None, otherwise return default."""
+    if value is None:
+        return default
+    return str(value)
+
+
 def generate_pdf_report(client, advisor):
     buffer = BytesIO()
     doc = SimpleDocTemplate(
@@ -85,13 +92,13 @@ def generate_pdf_report(client, advisor):
     # ── 2. Title ───────────────────────────────────────────
     content.append(Spacer(1, 3))
     content.append(Paragraph(
-        f"Prepared for <b>{client['client_name']}</b>",
+        f"Prepared for <b>{safe(client.get('client_name'), 'Client')}</b>",
         ParagraphStyle("Sub1", fontSize=14, textColor=NAVY,
             fontName="Times-Bold", alignment=TA_CENTER, spaceAfter=4)))
     content.append(Paragraph(
-        f"{advisor.get('full_name', 'Licensed Advisor')} "
+        f"{safe(advisor.get('full_name'), 'Licensed Advisor')} "
         f"&nbsp;&middot;&nbsp; "
-        f"{advisor.get('firm_name', 'Independent')}",
+        f"{safe(advisor.get('firm_name'), 'Independent')}",
         ParagraphStyle("Sub2", fontSize=10, textColor=MUTED,
             fontName="Helvetica", alignment=TA_CENTER, spaceAfter=14)))
     content.append(HRFlowable(width="100%", thickness=1.5,
@@ -115,17 +122,17 @@ def generate_pdf_report(client, advisor):
 
     profile = [
         [Paragraph("Client Name", s_label),
-         Paragraph(client["client_name"], s_bold),
+         Paragraph(safe(client.get("client_name"), "N/A"), s_bold),
          Paragraph("Life Stage", s_label),
-         Paragraph(client.get("life_stage", "N/A"), s_body)],
+         Paragraph(safe(client.get("life_stage"), "N/A"), s_body)],
         [Paragraph("Age", s_label),
-         Paragraph(str(client["age"]), s_body),
+         Paragraph(safe(client.get("age"), "N/A"), s_body),
          Paragraph("Risk Tolerance", s_label),
-         Paragraph(client["risk"], s_bold)],
+         Paragraph(safe(client.get("risk"), "N/A"), s_bold)],
         [Paragraph("Investment Amount", s_label),
-         Paragraph(f"${client['amount']:,}", s_bold),
+         Paragraph(f"${client['amount']:,}" if client.get("amount") else "N/A", s_bold),
          Paragraph("Time Horizon", s_label),
-         Paragraph(f"{client['horizon']} years", s_body)],
+         Paragraph(f"{client.get('horizon', 'N/A')} years", s_body)],
         [Paragraph("Portfolio Score", s_label),
          Paragraph(f"{client.get('score', 'N/A')}/100", s_bold),
          Paragraph("Report Date", s_label),
@@ -190,7 +197,7 @@ def generate_pdf_report(client, advisor):
     ]]
 
     for key, pct in allocation.items():
-        if pct > 0:
+        if pct and pct > 0:
             dollar = round((pct / 100) * client["amount"])
             label = cat_labels.get(key, key.replace("_", " ").title())
             note  = notes_map.get(key, "")
@@ -274,7 +281,6 @@ def generate_pdf_report(client, advisor):
             cat_color = instr_cat_colors.get(cat_key, NAVY)
             cat_name  = instr_cat_labels.get(cat_key, cat_key.upper())
 
-            # Category sub-header
             sub_hdr = Table(
                 [[Paragraph(cat_name, ParagraphStyle(
                     "CatHdr", fontSize=8, textColor=WHITE,
@@ -290,7 +296,6 @@ def generate_pdf_report(client, advisor):
             ]))
             content.append(sub_hdr)
 
-            # Instrument rows
             instr_rows = [[
                 Paragraph("Ticker", ParagraphStyle("IH1", fontSize=8,
                     textColor=WHITE, fontName="Helvetica-Bold")),
@@ -307,18 +312,18 @@ def generate_pdf_report(client, advisor):
             ]]
 
             for inst in cat_instr:
-                pct    = inst.get("allocation_pct", 0)
+                pct    = inst.get("allocation_pct", 0) or 0
                 dollar = inst.get("dollar_amount", 0) or (pct/100)*client["amount"]
                 instr_rows.append([
-                    Paragraph(inst.get("ticker", ""), s_bold),
-                    Paragraph(inst.get("name", ""), s_body),
+                    Paragraph(safe(inst.get("ticker"), ""), s_bold),
+                    Paragraph(safe(inst.get("name"), ""), s_body),
                     Paragraph(f"{pct}%", ParagraphStyle("IP", fontSize=9,
                         textColor=NAVY, fontName="Helvetica-Bold",
                         alignment=TA_CENTER)),
                     Paragraph(f"${dollar:,.0f}", ParagraphStyle("IA", fontSize=9,
                         textColor=TEXT, fontName="Helvetica-Bold",
                         alignment=TA_RIGHT)),
-                    Paragraph(inst.get("hold_period", ""), s_label),
+                    Paragraph(safe(inst.get("hold_period"), ""), s_label),
                 ])
 
             it = Table(instr_rows,
@@ -334,11 +339,10 @@ def generate_pdf_report(client, advisor):
             ]))
             content.append(it)
 
-            # Reasoning lines
             for inst in cat_instr:
                 if inst.get("reasoning"):
                     content.append(Paragraph(
-                        f"<b>{inst.get('ticker')}</b>: {inst.get('reasoning')}",
+                        f"<b>{safe(inst.get('ticker'))}</b>: {safe(inst.get('reasoning'))}",
                         ParagraphStyle("Reason", fontSize=7.5, textColor=MUTED,
                             fontName="Helvetica", leading=11,
                             spaceAfter=2, leftIndent=6)
@@ -352,32 +356,30 @@ def generate_pdf_report(client, advisor):
     content.append(section_bar("SUITABILITY ASSESSMENT"))
     content.append(Spacer(1, 6))
 
-    suitability = client.get("suitability_note", "")
-    for line in suitability.split("\n"):
-        line = line.strip()
-        if not line:
-            content.append(Spacer(1, 3))
-        elif line.isupper() and len(line) < 60:
-            content.append(Paragraph(line, ParagraphStyle(
-                "SH", fontSize=9, textColor=NAVY,
-                fontName="Helvetica-Bold",
-                spaceBefore=6, spaceAfter=2)))
-        else:
-            content.append(Paragraph(line, s_body))
+    suitability = safe(client.get("suitability_note"), "")
+    if suitability:
+        for line in suitability.split("\n"):
+            line = line.strip()
+            if not line:
+                content.append(Spacer(1, 3))
+            elif line.isupper() and len(line) < 60:
+                content.append(Paragraph(line, ParagraphStyle(
+                    "SH", fontSize=9, textColor=NAVY,
+                    fontName="Helvetica-Bold",
+                    spaceBefore=6, spaceAfter=2)))
+            else:
+                content.append(Paragraph(line, s_body))
 
     content.append(Spacer(1, 14))
 
-     # ── 7. Advisor Signature ───────────────────────────────
+    # ── 7. Advisor Signature ───────────────────────────────
     sig = [
         [Paragraph("Advisor Name:", s_label),
-         Paragraph(advisor.get("full_name", ""), s_bold),
+         Paragraph(safe(advisor.get("full_name"), ""), s_bold),
          Paragraph("Firm:", s_label),
-         Paragraph(advisor.get("firm_name", "Independent"), s_body)],
+         Paragraph(safe(advisor.get("firm_name"), "Independent"), s_body)],
         [Paragraph("CRD #:", s_label),
-         Paragraph(
-             advisor.get("license_number", "_______________________"),
-             s_body
-         ),
+         Paragraph(safe(advisor.get("license_number"), "_______________________"), s_body),
          Paragraph("Date:", s_label),
          Paragraph("_______________________", s_body)],
         [Paragraph("Signature:", s_label),
@@ -395,13 +397,13 @@ def generate_pdf_report(client, advisor):
         ("VALIGN",     (0,0), (-1,-1), "MIDDLE"),
     ]))
 
-    # Keep signature together with its header
     content.append(KeepTogether([
         section_bar("ADVISOR CONFIRMATION"),
         Spacer(1, 6),
         st,
         Spacer(1, 18),
     ]))
+
     # ── 8. Footer ──────────────────────────────────────────
     content.append(HRFlowable(width="100%", thickness=1,
         color=GOLD, spaceAfter=6))
