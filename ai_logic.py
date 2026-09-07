@@ -132,6 +132,10 @@ RULES:
 - Amounts under $50K prefer ETFs over individual stocks
 - Client over 60 with high risk: add a flag
 - Client under 35 with low risk: add a flag
+- CRITICAL: instrument allocation_pct values within each category MUST sum exactly to the category allocation percentage
+- Example: if equity_etfs = 35%, then all equity_etf instruments must sum to exactly 35%
+- Use multiple instruments per category to fill the full allocation
+- Never leave allocation gaps — every percentage point must be assigned to an instrument
 
 Return ONLY this exact JSON structure:
 {{

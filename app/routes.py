@@ -523,20 +523,37 @@ def save_client_route():
         except Exception:
             ai_data = {}
 
-        save_recommendation(advisor_id, result.get("client_id"), {
-            "client_name":      client_data["client_name"],
-            "age":              client_data["age"],
-            "life_stage":       client_data["life_stage"],
-            "amount":           client_data["amount"],
-            "risk":             client_data["risk"],
-            "horizon":          client_data["horizon"],
-            "selected_option":  client_data.get("selected_option", ""),
-            "ai_data":          ai_data,
-            "allocation":       client_data["allocation"],
-            "suitability_note": client_data["suitability_note"],
-            "score":            client_data["score"],
-        })
+        # Fetch original prices for drift tracking
+        instrument_prices = {}
+        try:
+            if ai_data and ai_data.get("options"):
+                selected_id = client_data.get("selected_option", "C")[0]
+                selected_opt = next(
+                    (o for o in ai_data["options"] if o.get("id") == selected_id),
+                    ai_data["options"][0] if ai_data["options"] else None
+                )
+                if selected_opt:
+                    from market_data import fetch_instrument_prices
+                    instrument_prices = fetch_instrument_prices(
+                        selected_opt.get("instruments", {})
+                    )
+        except Exception as e:
+            print(f"Price fetch error: {str(e)}")
 
+        save_recommendation(advisor_id, result.get("client_id"), {
+            "client_name":       client_data["client_name"],
+            "age":               client_data["age"],
+            "life_stage":        client_data["life_stage"],
+            "amount":            client_data["amount"],
+            "risk":              client_data["risk"],
+            "horizon":           client_data["horizon"],
+            "selected_option":   client_data.get("selected_option", ""),
+            "ai_data":           ai_data,
+            "allocation":        client_data["allocation"],
+            "suitability_note":  client_data["suitability_note"],
+            "score":             client_data["score"],
+            "instrument_prices": instrument_prices,
+        })
         flash(result["message"], "success")
     else:
         flash(result["message"], "error")
@@ -596,6 +613,311 @@ def view_client(client_id):
         advisor=session.get("advisor"),
         client=client)
 
+# ── Generate Talking Points ───────────────────────────────
+@main.route("/generate-talking-points", methods=["POST"])
+def generate_talking_points():
+    if not session.get("logged_in"):
+        return json.dumps({"success": False})
+
+    try:
+        data        = request.get_json()
+        client_name = data.get("client_name", "")
+        age         = data.get("age", 0)
+        life_stage  = data.get("life_stage", "")
+        risk        = data.get("risk", "")
+        horizon     = data.get("horizon", 0)
+        amount      = data.get("amount", 0)
+        score       = data.get("score", 0)
+        last_note   = data.get("last_note", "")
+
+        from openai import OpenAI
+        import os
+        ai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+        prompt = f"""You are a senior financial advisor preparing for a client meeting.
+
+CLIENT: {client_name}
+Age: {age} | Life Stage: {life_stage} | Risk: {risk}
+Investment: ${amount:,} | Horizon: {horizon} years | Score: {score}/100
+Last meeting notes: {last_note if last_note else 'No previous notes'}
+
+Generate exactly 4 specific conversation starters for this client meeting.
+Each should be a question or talking point tailored to this specific client.
+Focus on: portfolio performance, life changes, goals, market conditions.
+
+Return ONLY a JSON array of 4 strings:
+["talking point 1", "talking point 2", "talking point 3", "talking point 4"]"""
+
+        response = ai.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=400,
+            temperature=0.7
+        )
+
+        content = response.choices[0].message.content.strip()
+        if content.startswith("```"):
+            content = content.split("```")[1]
+            if content.startswith("json"):
+                content = content[4:]
+        if content.endswith("```"):
+            content = content[:-3]
+
+        points = json.loads(content.strip())
+        return json.dumps({"success": True, "points": points})
+
+    except Exception as e:
+        print(f"Talking points error: {str(e)}")
+        return json.dumps({"success": False, "error": str(e)})
+
+# ── Meeting Prep Market Data ──────────────────────────────
+@main.route("/meeting-prep-market-data", methods=["POST"])
+def meeting_prep_market_data():
+    if not session.get("logged_in"):
+        return json.dumps({"success": False})
+
+    try:
+        data       = request.get_json()
+        allocation = data.get("allocation", {})
+        risk       = data.get("risk", "Medium")
+        amount     = data.get("amount", 0)
+
+        from market_data import get_rates
+        try:
+            rates = get_rates()
+        except Exception:
+            rates = {}
+
+        # Use fallback values if FRED API fails
+        t10 = rates.get("10_year_treasury") or None
+        t1  = rates.get("1_year_treasury") or None
+        cd  = rates.get("cd_1_year") or None
+
+        # If any rate is unavailable return error so frontend shows message
+        if not t10 or not t1 or not cd:
+            return json.dumps({
+                "success": False,
+                "message": "Market data temporarily unavailable. Please reload the page to try again."
+            })
+
+        items = []
+
+        # 10-Year Treasury insight
+        bond_pct    = allocation.get("bond_etfs", 0)
+        bond_amt    = round((bond_pct / 100) * amount) if bond_pct else 0
+        t10_insight = f"Client has {bond_pct}% (${bond_amt:,}) in Bond ETFs — rising yields affect bond prices." if bond_pct > 0 else "No bond exposure in this portfolio."
+
+        items.append({
+            "label":     "10-Year Treasury Yield",
+            "value":     f"{t10}%",
+            "direction": "neutral",
+            "sub":       "Long-term benchmark rate",
+            "insight":   t10_insight
+        })
+
+        # 1-Year Treasury insight
+        cd_pct     = allocation.get("cds", 0)
+        cd_amt     = round((cd_pct / 100) * amount) if cd_pct else 0
+        t1_insight = f"Client's {cd_pct}% (${cd_amt:,}) in CDs earns close to this rate." if cd_pct > 0 else "Consider CDs as a stable income option."
+
+        items.append({
+            "label":     "1-Year Treasury Yield",
+            "value":     f"{t1}%",
+            "direction": "neutral",
+            "sub":       "Short-term rate benchmark",
+            "insight":   t1_insight
+        })
+
+        # CD Rate insight
+        eq_pct     = allocation.get("equity_etfs", 0) + allocation.get("growth_stocks", 0)
+        cd_insight = f"With {eq_pct}% in equities, current CD rates offer a {risk.lower()}-risk alternative worth discussing." if eq_pct > 50 else f"Current best CD rate aligns well with this {risk.lower()} risk portfolio."
+
+        items.append({
+            "label":     "Best 1-Year CD Rate",
+            "value":     f"{cd}%",
+            "direction": "neutral",
+            "sub":       "FDIC-insured guaranteed return",
+            "insight":   cd_insight
+        })
+
+        return json.dumps({"success": True, "items": items})
+
+    except Exception as e:
+        print(f"Meeting prep market data error: {str(e)}")
+        return json.dumps({"success": False})
+    
+# ── Portfolio Drift Analysis ──────────────────────────────
+@main.route("/portfolio-drift", methods=["POST"])
+def portfolio_drift():
+    if not session.get("logged_in"):
+        return json.dumps({"success": False})
+
+    try:
+        data            = request.get_json()
+        allocation      = data.get("allocation", {})
+        instruments     = data.get("instruments", {})
+        amount          = data.get("amount", 0)
+        original_prices = data.get("original_prices", {})
+
+        import yfinance as yf
+        from concurrent.futures import ThreadPoolExecutor
+
+        cat_labels = {
+            "equity_etfs":   "Equity ETFs",
+            "growth_stocks": "Growth Stocks",
+            "bond_etfs":     "Bond ETFs",
+            "mutual_funds":  "Mutual Funds",
+            "cds":           "CDs"
+        }
+
+        def fetch_price(ticker):
+            try:
+                if ticker.startswith("CD-") or ticker == "TBILL":
+                    return ticker, None
+                info  = yf.Ticker(ticker).info
+                price = info.get("regularMarketPrice") or \
+                        info.get("currentPrice") or \
+                        info.get("navPrice", 0)
+                return ticker, float(price) if price else None
+            except Exception:
+                return ticker, None
+
+        all_tickers = []
+        for cat, items in instruments.items():
+            for inst in items:
+                ticker = inst.get("ticker", "")
+                if ticker and ticker not in all_tickers:
+                    all_tickers.append(ticker)
+
+        current_prices = {}
+        if all_tickers:
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                results = executor.map(fetch_price, all_tickers)
+                for ticker, price in results:
+                    if price:
+                        current_prices[ticker] = price
+
+        results = []
+
+        for cat, target_pct in allocation.items():
+            if not target_pct or target_pct == 0:
+                continue
+
+            target_amt    = round((target_pct / 100) * amount)
+            cat_instrs    = instruments.get(cat, [])
+            inst_details  = []
+            current_value = 0
+            has_real_data = False
+
+            for inst in cat_instrs:
+                ticker       = inst.get("ticker", "")
+                inst_pct     = inst.get("allocation_pct", 0)
+                original_amt = round((inst_pct / 100) * amount)
+
+                if ticker.startswith("CD-") or ticker == "TBILL":
+                    current_value += original_amt
+                    continue
+
+                orig_price    = original_prices.get(ticker)
+                current_price = current_prices.get(ticker)
+
+                if orig_price and current_price and orig_price > 0:
+                    shares         = original_amt / orig_price
+                    current_value += round(shares * current_price)
+                    has_real_data  = True
+                    pct_change     = round(((current_price - orig_price) / orig_price) * 100, 2)
+                    inst_details.append({
+                        "ticker":        ticker,
+                        "name":          inst.get("name", ""),
+                        "orig_price":    round(orig_price, 2),
+                        "current_price": round(current_price, 2),
+                        "pct_change":    pct_change,
+                        "direction":     "up" if pct_change > 0 else "down" if pct_change < 0 else "flat"
+                    })
+                else:
+                    current_value += original_amt
+
+            current_pct = round((current_value / amount) * 100, 1) if amount > 0 else target_pct
+            drift_pct   = round(current_pct - target_pct, 1)
+            drift_amt   = round(current_value - target_amt)
+
+            if drift_pct > 2:
+                action      = f"Consider trimming ${abs(drift_amt):,}"
+                action_type = "sell"
+            elif drift_pct < -2:
+                action      = f"Consider adding ${abs(drift_amt):,}"
+                action_type = "buy"
+            else:
+                action      = "On target — hold"
+                action_type = "hold"
+
+            results.append({
+                "category":      cat_labels.get(cat, cat),
+                "target_pct":    target_pct,
+                "current_pct":   current_pct,
+                "drift_pct":     drift_pct,
+                "drift_amt":     drift_amt,
+                "action":        action,
+                "action_type":   action_type,
+                "has_real_data": has_real_data,
+                "instruments":   inst_details
+            })
+
+        return json.dumps({"success": True, "results": results})
+
+    except Exception as e:
+        print(f"Portfolio drift error: {str(e)}")
+        return json.dumps({"success": False, "error": str(e)})
+                
+# ── Meeting Prep ──────────────────────────────────────────
+@main.route("/clients/<client_id>/meeting-prep")
+def meeting_prep(client_id):
+    if not session.get("logged_in"):
+        flash("Please log in to continue.", "info")
+        return redirect(url_for("main.login"))
+
+    advisor_id = session["advisor"]["user_id"]
+    client     = get_client(client_id, advisor_id)
+
+    if not client:
+        flash("Client not found.", "error")
+        return redirect(url_for("main.clients"))
+
+    try:
+        recs = get_client_recommendations(advisor_id, client_id)
+        latest_rec = recs[0] if recs else None
+    except Exception:
+        latest_rec = None
+
+    try:
+        from notes_db import get_client_notes
+        notes = get_client_notes(advisor_id, client_id)
+    except Exception:
+        notes = []
+
+    from datetime import datetime
+    now = datetime.now()
+    return render_template("clients/meeting_prep.html",
+        advisor=session.get("advisor"),
+        client=client,
+        latest_rec=latest_rec,
+        notes=notes,
+        today=now.strftime("%B %d, %Y"),
+        today_iso=now.strftime("%Y-%m-%d"))
+
+# ── Meeting Prep Landing ──────────────────────────────────
+@main.route("/meeting-prep")
+def meeting_prep_landing():
+    if not session.get("logged_in"):
+        flash("Please log in to continue.", "info")
+        return redirect(url_for("main.login"))
+
+    advisor_id  = session["advisor"]["user_id"]
+    all_clients = get_all_clients(advisor_id)
+
+    return render_template("clients/meeting_prep_landing.html",
+        advisor=session.get("advisor"),
+        clients=all_clients)
 
 # ── All Recommendations ───────────────────────────────────
 @main.route("/recommendations")
@@ -678,6 +1000,7 @@ def add_note_route():
     subject      = request.form.get("subject", "").strip()
     body         = request.form.get("body", "").strip()
     meeting_date = request.form.get("meeting_date", "")
+    redirect_to  = request.form.get("redirect_to", "notes")
 
     if not client_id or not subject or not body:
         flash("Please fill in all required fields.", "error")
@@ -690,8 +1013,10 @@ def add_note_route():
     else:
         flash("Could not save note. Please try again.", "error")
 
-    return redirect(url_for("main.notes"))
+    if redirect_to == "meeting_prep":
+        return redirect(url_for("main.meeting_prep", client_id=client_id))
 
+    return redirect(url_for("main.notes"))
 
 # ── Delete Note ───────────────────────────────────────────
 @main.route("/notes/delete/<note_id>", methods=["POST"])

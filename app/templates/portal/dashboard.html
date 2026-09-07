@@ -21,7 +21,7 @@
 <style>
     .stats-row {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(4, 1fr);
         gap: 16px;
         margin-bottom: 28px;
     }
@@ -277,7 +277,18 @@
         <a href="{{ url_for('main.notes') }}"
            class="action-card-link">View Notes →</a>
     </div>
-
+       
+    <div class="action-card">
+        <div class="action-card-icon"
+             style="background:#fff8ee">📋</div>
+        <div class="action-card-title">Meeting Prep</div>
+        <div class="action-card-desc">
+            Prepare for client meetings with a full
+            briefing — portfolio, notes and AI talking points
+        </div>
+        <a href="{{ url_for('main.meeting_prep_landing') }}"
+           class="action-card-link">Prepare Now →</a>
+    </div>
 </div>
 
 <!-- Getting Started -->

@@ -25,19 +25,20 @@ def save_recommendation(advisor_id, client_id, rec_data):
     """
     try:
         result = get_supabase().table("recommendations").insert({
-            "advisor_id":      advisor_id,
-            "client_id":       client_id,
-            "client_name":     rec_data.get("client_name", ""),
-            "age":             rec_data.get("age", 0),
-            "life_stage":      rec_data.get("life_stage", ""),
-            "amount":          rec_data.get("amount", 0),
-            "risk":            rec_data.get("risk", ""),
-            "horizon":         rec_data.get("horizon", 0),
-            "selected_option": rec_data.get("selected_option", ""),
-            "ai_data":         rec_data.get("ai_data", {}),
-            "allocation":      rec_data.get("allocation", {}),
+            "advisor_id":       advisor_id,
+            "client_id":        client_id,
+            "client_name":      rec_data.get("client_name", ""),
+            "age":              rec_data.get("age", 0),
+            "life_stage":       rec_data.get("life_stage", ""),
+            "amount":           rec_data.get("amount", 0),
+            "risk":             rec_data.get("risk", ""),
+            "horizon":          rec_data.get("horizon", 0),
+            "selected_option":  rec_data.get("selected_option", ""),
+            "ai_data":          rec_data.get("ai_data", {}),
+            "allocation":       rec_data.get("allocation", {}),
             "suitability_note": rec_data.get("suitability_note", ""),
-            "score":           rec_data.get("score", 0),
+            "score":            rec_data.get("score", 0),
+            "instrument_prices": rec_data.get("instrument_prices", {}),
         }).execute()
 
         if result.data:
@@ -47,7 +48,6 @@ def save_recommendation(advisor_id, client_id, rec_data):
     except Exception as e:
         print(f"Save recommendation error: {str(e)}")
         return {"success": False, "message": str(e)}
-
 
 def get_all_recommendations(advisor_id):
     """

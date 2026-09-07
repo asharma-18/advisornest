@@ -146,3 +146,38 @@ def get_all_market_data(risk):
             "mutual_funds": future_mutual.result(),
             "rates":        future_rates.result()
         }
+
+def fetch_instrument_prices(instruments):
+    """
+    Fetches current prices for all instruments in a recommendation.
+    Called when saving a recommendation to store original prices.
+    Returns dict: {ticker: price}
+    """
+    prices = {}
+    all_tickers = []
+
+    for cat, items in instruments.items():
+        for inst in items:
+            ticker = inst.get("ticker", "")
+            if ticker and not ticker.startswith("CD-") and ticker != "TBILL":
+                all_tickers.append(ticker)
+
+    if not all_tickers:
+        return prices
+
+    def fetch_one(ticker):
+        try:
+            info  = yf.Ticker(ticker).info
+            price = info.get("regularMarketPrice") or \
+                    info.get("currentPrice") or \
+                    info.get("navPrice", 0)
+            return ticker, float(price) if price else 0
+        except Exception:
+            return ticker, 0
+
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        results = executor.map(fetch_one, all_tickers)
+        for ticker, price in results:
+            prices[ticker] = price
+
+    return prices

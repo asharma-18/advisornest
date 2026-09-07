@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+
+{% block title %}Meeting Prep — AdvisorNest{% endblock %}
+{% block page_title %}Meeting Prep{% endblock %}
+{% block page_subtitle %}Select a client to open their briefing{% endblock %}
+
+{% block extra_css %}
+<style>
+    .prep-search-wrap {
+        margin-bottom: 24px;
+    }
+
+    .prep-search-input {
+        width: 100%;
+        height: 48px;
+        background: white;
+        border: 1.5px solid var(--border);
+        border-radius: 10px;
+        padding: 0 20px 0 48px;
+        font-size: 0.95rem;
+        font-family: var(--font-body);
+        color: var(--text-primary);
+        outline: none;
+        transition: border-color 0.2s;
+        box-sizing: border-box;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%238892a4' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: 16px center;
+    }
+
+    .prep-search-input:focus {
+        border-color: var(--navy);
+    }
+
+    .prep-section-label {
+        font-size: 0.68rem;
+        font-weight: 700;
+        color: var(--text-muted);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        margin-bottom: 12px;
+    }
+
+    .prep-client-list {
+        background: white;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .prep-client-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border-light);
+        text-decoration: none;
+        transition: background 0.15s;
+        cursor: pointer;
+    }
+
+    .prep-client-item:last-child {
+        border-bottom: none;
+    }
+
+    .prep-client-item:hover {
+        background: var(--bg-primary);
+    }
+
+    .prep-client-left {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+    }
+
+    .prep-client-avatar {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        background: var(--navy);
+        color: white;
+        font-family: var(--font-heading);
+        font-size: 1rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .prep-client-name {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 3px;
+    }
+
+    .prep-client-meta {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+    }
+
+    .prep-client-right {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .prep-client-badge {
+        font-size: 0.7rem;
+        font-weight: 700;
+        padding: 3px 10px;
+        border-radius: 20px;
+    }
+
+    .prep-client-arrow {
+        font-size: 0.9rem;
+        color: var(--text-muted);
+    }
+
+    .prep-empty {
+        text-align: center;
+        padding: 48px 20px;
+        background: white;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+    }
+
+    @media (max-width: 768px) {
+        .prep-client-badge {
+            display: none;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block page_content %}
+
+{% if not clients %}
+<div class="prep-empty">
+    <div style="font-size:2.5rem;margin-bottom:12px;opacity:0.3">📋</div>
+    <div style="font-family:var(--font-heading);font-size:1.1rem;
+                color:var(--text-secondary);margin-bottom:6px">
+        No clients yet
+    </div>
+    <div style="font-size:0.825rem;color:var(--text-muted);margin-bottom:20px">
+        Generate a recommendation and save a client first.
+    </div>
+    <a href="{{ url_for('main.portal') }}" class="btn btn-primary">
+        Generate First Recommendation
+    </a>
+</div>
+
+{% else %}
+
+<!-- ── Search ─────────────────────────────────────────── -->
+<div class="prep-search-wrap">
+    <input
+        type="text"
+        id="prep-search"
+        class="prep-search-input"
+        placeholder="Search clients by name..."
+        autocomplete="off"
+    >
+</div>
+
+<!-- ── Client List ────────────────────────────────────── -->
+<div class="prep-section-label">
+    {{ clients|length }} client{{ 's' if clients|length != 1 else '' }} — click to open briefing
+</div>
+
+<div class="prep-client-list" id="prep-client-list">
+    {% for client in clients %}
+    <a href="{{ url_for('main.meeting_prep', client_id=client.id) }}"
+       class="prep-client-item"
+       data-name="{{ client.client_name.lower() }}">
+
+        <div class="prep-client-left">
+            <div class="prep-client-avatar">
+                {{ client.client_name[0].upper() }}
+            </div>
+            <div>
+                <div class="prep-client-name">
+                    {{ client.client_name }}
+                </div>
+                <div class="prep-client-meta">
+                    Age {{ client.age }} · {{ client.life_stage }} ·
+                    ${{ "{:,}".format(client.amount) }} ·
+                    {{ client.horizon }} yrs
+                </div>
+            </div>
+        </div>
+
+        <div class="prep-client-right">
+            <span class="prep-client-badge
+                {% if client.risk == 'High' %}
+                    badge-error
+                {% elif client.risk == 'Medium' %}
+                    badge-gold
+                {% else %}
+                    badge-success
+                {% endif %}">
+                {{ client.risk }} Risk
+            </span>
+            <span class="prep-client-arrow">→</span>
+        </div>
+
+    </a>
+    {% endfor %}
+</div>
+
+<!-- No results state -->
+<div id="prep-no-results"
+     style="display:none;text-align:center;padding:32px;
+            background:white;border:1px solid var(--border);
+            border-radius:12px;color:var(--text-muted);
+            font-size:0.875rem">
+    No clients match your search.
+</div>
+
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const prepSearch = document.getElementById('prep-search');
+if (prepSearch) {
+    prepSearch.addEventListener('input', function() {
+        const query   = this.value.toLowerCase().trim();
+        const items   = document.querySelectorAll('.prep-client-item');
+        const noRes   = document.getElementById('prep-no-results');
+        const list    = document.getElementById('prep-client-list');
+        let visible   = 0;
+
+        items.forEach(function(item) {
+            const name = item.getAttribute('data-name') || '';
+            if (query === '' || name.includes(query)) {
+                item.style.display = '';
+                visible++;
+            } else {
+                item.style.display = 'none';
+            }
+        });
+
+        if (noRes) noRes.style.display = visible === 0 ? 'block' : 'none';
+        if (list)  list.style.display  = visible === 0 ? 'none'  : 'block';
+    });
+
+    prepSearch.addEventListener('focus', function() {
+        this.style.borderColor = 'var(--navy)';
+    });
+
+    prepSearch.addEventListener('blur', function() {
+        this.style.borderColor = 'var(--border)';
+    });
+}
+</script>
+{% endblock %}
