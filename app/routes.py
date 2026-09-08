@@ -745,7 +745,337 @@ def meeting_prep_market_data():
     except Exception as e:
         print(f"Meeting prep market data error: {str(e)}")
         return json.dumps({"success": False})
-    
+
+# ── Market Watch ──────────────────────────────────────────
+@main.route("/market-watch")
+def market_watch():
+    if not session.get("logged_in"):
+        flash("Please log in to continue.", "info")
+        return redirect(url_for("main.login"))
+
+    advisor_id  = session["advisor"]["user_id"]
+    all_clients = get_all_clients(advisor_id)
+
+    # Get all unique instruments across all client portfolios
+    from recommendations_db import get_all_recommendations
+    all_recs = get_all_recommendations(advisor_id)
+
+    instrument_count = {}
+    for rec in all_recs:
+        ai_data = rec.get("ai_data", {})
+        if not ai_data:
+            continue
+        options = ai_data.get("options", [])
+        sel_id  = rec.get("selected_option", "C")
+        sel_id  = sel_id[0] if sel_id else "C"
+        sel_opt = next((o for o in options if o.get("id") == sel_id), None)
+        if not sel_opt:
+            continue
+        instruments = sel_opt.get("instruments", {})
+        for cat, items in instruments.items():
+            for inst in items:
+                ticker = inst.get("ticker", "")
+                if ticker and not ticker.startswith("CD-") and ticker != "TBILL":
+                    if ticker not in instrument_count:
+                        instrument_count[ticker] = {
+                            "ticker": ticker,
+                            "name":   inst.get("name", ticker),
+                            "count":  0
+                        }
+                    instrument_count[ticker]["count"] += 1
+
+    # Sort by most held
+    portfolio_instruments = sorted(
+        instrument_count.values(),
+        key=lambda x: x["count"],
+        reverse=True
+    )[:15]
+
+    return render_template("portal/market_watch.html",
+        advisor=session.get("advisor"),
+        portfolio_instruments=portfolio_instruments,
+        client_count=len(all_clients))
+
+# ── Market Watch Data ─────────────────────────────────────
+@main.route("/market-watch-data", methods=["POST"])
+def market_watch_data():
+    if not session.get("logged_in"):
+        return json.dumps({"success": False})
+
+    try:
+        data      = request.get_json()
+        data_type = data.get("type", "")
+
+        import yfinance as yf
+        from concurrent.futures import ThreadPoolExecutor
+
+        # ── Indices ──────────────────────────────────────
+        if data_type == "indices":
+            index_tickers = {
+                "^GSPC": "S&P 500",
+                "^IXIC": "Nasdaq",
+                "^DJI":  "Dow Jones",
+                "^RUT":  "Russell 2000"
+            }
+
+            def fetch_index(item):
+                ticker, name = item
+                try:
+                    info  = yf.Ticker(ticker).info
+                    price = info.get("regularMarketPrice") or info.get("currentPrice", 0)
+                    prev  = info.get("regularMarketPreviousClose", price)
+                    change     = round(price - prev, 2)
+                    change_pct = round((change / prev) * 100, 2) if prev else 0
+                    return {
+                        "ticker":     ticker,
+                        "name":       name,
+                        "price":      f"{price:,.2f}",
+                        "change":     f"{'+' if change >= 0 else ''}{change:,.2f}",
+                        "change_pct": change_pct,
+                        "direction":  "up" if change >= 0 else "down"
+                    }
+                except Exception:
+                    return {"ticker": ticker, "name": name, "price": "N/A",
+                            "change": "N/A", "change_pct": 0, "direction": "flat"}
+
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                indices = list(executor.map(fetch_index, index_tickers.items()))
+
+            return json.dumps({"success": True, "indices": indices})
+
+        # ── Rates ────────────────────────────────────────
+        elif data_type == "rates":
+            from market_data import get_rates
+            try:
+                rates = get_rates()
+            except Exception:
+                rates = {}
+
+            rate_items = [
+                {"label": "3-Month Treasury", "value": rates.get("3_month_treasury", "N/A")},
+                {"label": "1-Year Treasury",  "value": rates.get("1_year_treasury",  "N/A")},
+                {"label": "2-Year Treasury",  "value": rates.get("5_year_treasury",  "N/A")},
+                {"label": "10-Year Treasury", "value": rates.get("10_year_treasury", "N/A")},
+                {"label": "30-Year Treasury", "value": rates.get("30_year_treasury", "N/A")},
+                {"label": "Best 1-Year CD",   "value": rates.get("cd_1_year",        "N/A")},
+            ]
+
+            return json.dumps({"success": True, "rates": rate_items})
+
+        # ── Holdings ─────────────────────────────────────
+        elif data_type == "holdings":
+            tickers = data.get("tickers", [])
+
+            def fetch_price(ticker):
+                try:
+                    info  = yf.Ticker(ticker).info
+                    price = info.get("regularMarketPrice") or info.get("currentPrice", 0)
+                    prev  = info.get("regularMarketPreviousClose", price)
+                    change_pct = round(((price - prev) / prev) * 100, 2) if prev else 0
+                    return ticker, {
+                        "price":      round(price, 2),
+                        "change_pct": change_pct
+                    }
+                except Exception:
+                    return ticker, {"price": "N/A", "change_pct": 0}
+
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                results = dict(executor.map(fetch_price, tickers))
+
+            return json.dumps({"success": True, "prices": results})
+
+       
+     # ── Search by ticker or name ──────────────────────
+        elif data_type == "search":
+            query = data.get("ticker", "").strip()
+            try:
+                import requests as req
+
+                # Use Yahoo Finance search API to find matching tickers
+                search_url = f"https://query1.finance.yahoo.com/v1/finance/search?q={query}&quotesCount=5&newsCount=0"
+                headers    = {"User-Agent": "Mozilla/5.0"}
+                response   = req.get(search_url, headers=headers, timeout=5)
+                results    = response.json().get("quotes", [])
+
+                matches = []
+                for r in results:
+                    ticker_sym = r.get("symbol", "")
+                    name       = r.get("longname") or r.get("shortname", ticker_sym)
+                    if ticker_sym and r.get("quoteType") in ["EQUITY", "ETF", "MUTUALFUND"]:
+                        matches.append({
+                            "ticker": ticker_sym,
+                            "name":   name,
+                            "type":   r.get("quoteType", "")
+                        })
+
+                return json.dumps({"success": True, "matches": matches})
+
+            except Exception as e:
+                return json.dumps({"success": False, "error": str(e)})
+
+        # ── Get single ticker detail ──────────────────────
+        elif data_type == "ticker_detail":
+            ticker = data.get("ticker", "").upper()
+            try:
+                info       = yf.Ticker(ticker).info
+                price      = info.get("regularMarketPrice") or info.get("currentPrice", 0)
+                prev       = info.get("regularMarketPreviousClose", price)
+                change_pct = round(((price - prev) / prev) * 100, 2) if prev else 0
+                name       = info.get("longName") or info.get("shortName", ticker)
+
+                return json.dumps({
+                    "success": True,
+                    "info": {
+                        "ticker":         ticker,
+                        "name":           name,
+                        "price":          round(price, 2),
+                        "change_pct":     change_pct,
+                        "week52_high":    round(info.get("fiftyTwoWeekHigh", 0), 2),
+                        "week52_low":     round(info.get("fiftyTwoWeekLow", 0), 2),
+                        "pe_ratio":       round(info.get("trailingPE", 0), 1) if info.get("trailingPE") else "N/A",
+                        "dividend_yield": f"{round(info.get('dividendYield', 0) * 100, 2)}%" if info.get("dividendYield") else "N/A",
+                        "market_cap":     info.get("marketCap", 0)
+                    }
+                })
+            except Exception as e:
+                return json.dumps({"success": False, "error": str(e)})
+
+         # ── Top Gainers ───────────────────────────────────
+        elif data_type == "gainers":
+            try:
+                import requests as req
+
+                headers = {"User-Agent": "Mozilla/5.0"}
+
+                # Fetch top gainers from Yahoo Finance screener
+                gainers_url = "https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?formatted=false&lang=en-US&region=US&scrIds=day_gainers&count=10"
+                losers_url  = "https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?formatted=false&lang=en-US&region=US&scrIds=day_losers&count=5"
+
+                gainers_resp = req.get(gainers_url, headers=headers, timeout=8)
+                losers_resp  = req.get(losers_url,  headers=headers, timeout=8)
+
+                gainers_data = gainers_resp.json()
+                losers_data  = losers_resp.json()
+
+                results = []
+
+                # Process gainers
+                gainers_quotes = gainers_data.get("finance", {}).get("result", [{}])[0].get("quotes", [])
+                for q in gainers_quotes[:7]:
+                    results.append({
+                        "ticker":     q.get("symbol", ""),
+                        "name":       q.get("longName") or q.get("shortName", ""),
+                        "price":      round(q.get("regularMarketPrice", 0), 2),
+                        "change_pct": round(q.get("regularMarketChangePercent", 0), 2),
+                        "direction":  "up"
+                    })
+
+                # Process losers
+                losers_quotes = losers_data.get("finance", {}).get("result", [{}])[0].get("quotes", [])
+                for q in losers_quotes[:3]:
+                    results.append({
+                        "ticker":     q.get("symbol", ""),
+                        "name":       q.get("longName") or q.get("shortName", ""),
+                        "price":      round(q.get("regularMarketPrice", 0), 2),
+                        "change_pct": round(q.get("regularMarketChangePercent", 0), 2),
+                        "direction":  "down"
+                    })
+
+                if results:
+                    return json.dumps({"success": True, "gainers": results})
+
+                # Fallback to yfinance if Yahoo API fails
+                raise Exception("No data from Yahoo screener")
+
+            except Exception:
+                # Fallback
+                fallback_tickers = [
+                    "NVDA", "MSFT", "AAPL", "GOOGL", "AMZN",
+                    "META", "TSLA", "AMD", "CRM", "NFLX"
+                ]
+
+                def fetch_gainer(ticker):
+                    try:
+                        info  = yf.Ticker(ticker).info
+                        price = info.get("regularMarketPrice") or info.get("currentPrice", 0)
+                        prev  = info.get("regularMarketPreviousClose", price)
+                        change_pct = round(((price - prev) / prev) * 100, 2) if prev else 0
+                        name       = info.get("longName") or info.get("shortName", ticker)
+                        return {
+                            "ticker":     ticker,
+                            "name":       name,
+                            "price":      round(price, 2),
+                            "change_pct": change_pct,
+                            "direction":  "up" if change_pct > 0 else "down"
+                        }
+                    except Exception:
+                        return None
+
+                with ThreadPoolExecutor(max_workers=10) as executor:
+                    results = list(executor.map(fetch_gainer, fallback_tickers))
+
+                results = [r for r in results if r]
+                results.sort(key=lambda x: x["change_pct"], reverse=True)
+
+                return json.dumps({"success": True, "gainers": results})
+            
+         # ── News ─────────────────────────────────────────
+        elif data_type == "news":
+            import feedparser
+            feeds = [
+                ("MarketWatch", "https://feeds.marketwatch.com/marketwatch/topstories/"),
+                ("Seeking Alpha", "https://seekingalpha.com/feed.xml"),
+                ("Yahoo Finance", "https://finance.yahoo.com/news/rssindex"),
+                ("Investing.com", "https://www.investing.com/rss/news.rss"),
+            ]
+
+            news_items = []
+            for source, url in feeds:
+                try:
+                    feed = feedparser.parse(url)
+                    for entry in feed.entries[:4]:
+                        title = entry.get("title", "").strip()
+                        link  = entry.get("link", "#")
+                        if title and len(title) > 10:
+                            news_items.append({
+                                "title":  title,
+                                "link":   link,
+                                "source": source,
+                                "date":   entry.get("published", "")[:16] if entry.get("published") else ""
+                            })
+                    if len(news_items) >= 10:
+                        break
+                except Exception:
+                    continue
+
+            if news_items:
+                return json.dumps({"success": True, "news": news_items[:10]})
+
+            # Fallback — use Yahoo Finance news API
+            try:
+                import requests as req
+                headers  = {"User-Agent": "Mozilla/5.0"}
+                response = req.get(
+                    "https://query1.finance.yahoo.com/v1/finance/trending/US",
+                    headers=headers, timeout=5
+                )
+                trending = response.json().get("finance", {}).get("result", [{}])[0].get("quotes", [])
+                news_items = [{
+                    "title":  f"{q.get('symbol', '')} is trending today",
+                    "link":   f"https://finance.yahoo.com/quote/{q.get('symbol', '')}",
+                    "source": "Yahoo Finance",
+                    "date":   ""
+                } for q in trending[:10]]
+                return json.dumps({"success": True, "news": news_items})
+            except Exception:
+                return json.dumps({"success": False})
+
+        return json.dumps({"success": False, "error": "Unknown data type"})
+
+    except Exception as e:
+        print(f"Market watch data error: {str(e)}")
+        return json.dumps({"success": False, "error": str(e)})
+
 # ── Portfolio Drift Analysis ──────────────────────────────
 @main.route("/portfolio-drift", methods=["POST"])
 def portfolio_drift():
@@ -904,6 +1234,7 @@ def meeting_prep(client_id):
         notes=notes,
         today=now.strftime("%B %d, %Y"),
         today_iso=now.strftime("%Y-%m-%d"))
+
 
 # ── Meeting Prep Landing ──────────────────────────────────
 @main.route("/meeting-prep")

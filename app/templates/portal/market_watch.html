@@ -1,0 +1,736 @@
+{% extends "base.html" %}
+
+{% block title %}Market Watch — AdvisorNest{% endblock %}
+{% block page_title %}Market Watch{% endblock %}
+{% block page_subtitle %}Live market data and financial news{% endblock %}
+
+{% block extra_css %}
+<style>
+    .market-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-bottom: 20px;
+    }
+
+    .market-card {
+        background: white;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .market-card-header {
+        background: var(--navy);
+        padding: 12px 18px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .market-card-title {
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: white;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+    }
+
+    .market-card-body {
+        padding: 18px;
+    }
+
+    /* ── Index row ── */
+    .index-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--border-light);
+    }
+
+    .index-row:last-child { border-bottom: none; }
+
+    .index-name {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+
+    .index-ticker {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        margin-top: 2px;
+    }
+
+    .index-price {
+        text-align: right;
+    }
+
+    .index-value {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        font-family: var(--font-body);
+    }
+    .index-change {
+        font-size: 0.75rem;
+        font-weight: 600;
+        margin-top: 2px;
+    }
+
+    .index-change.up   { color: #2d7d4f; }
+    .index-change.down { color: #c53030; }
+    .index-change.flat { color: var(--text-muted); }
+
+    /* ── Rate row ── */
+    .rate-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--border-light);
+    }
+
+    .rate-row:last-child { border-bottom: none; }
+
+    .rate-label {
+        font-size: 0.825rem;
+        color: var(--text-secondary);
+    }
+
+    .rate-value {
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--navy);
+        font-family: var(--font-body);
+    }
+
+    /* ── Movers ── */
+    .mover-row {
+        display: grid;
+        grid-template-columns: 55px 1fr 70px 80px;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--border-light);
+        font-size: 0.8rem;
+    }
+
+    .mover-row:last-child { border-bottom: none; }
+
+    .mover-ticker {
+        font-weight: 700;
+        color: var(--navy);
+    }
+
+    .mover-name {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+    }
+
+    .mover-price {
+        text-align: right;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+
+    .mover-change {
+        text-align: right;
+        font-weight: 700;
+        font-size: 0.78rem;
+        padding: 2px 8px;
+        border-radius: 4px;
+    }
+
+    .mover-change.up   { background:#f0fff4; color:#2d7d4f; }
+    .mover-change.down { background:#fff5f5; color:#c53030; }
+
+    /* ── Portfolio holdings ── */
+    .holding-row {
+        display: grid;
+        grid-template-columns: 55px 1fr 50px 70px 80px;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--border-light);
+        font-size: 0.8rem;
+    }
+
+    .holding-row:last-child { border-bottom: none; }
+
+    .holding-ticker { font-weight: 700; color: var(--navy); }
+    .holding-name   { font-size: 0.75rem; color: var(--text-secondary); }
+    .holding-count  { text-align: center; font-size: 0.72rem; color: var(--text-muted); }
+    .holding-price  { text-align: right; font-weight: 600; }
+
+    /* ── Search ── */
+    .ticker-search-wrap {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 16px;
+    }
+
+    .ticker-search-input {
+        flex: 1;
+        height: 40px;
+        background: var(--bg-primary);
+        border: 1.5px solid var(--border);
+        border-radius: 8px;
+        padding: 0 14px;
+        font-size: 0.875rem;
+        font-family: var(--font-body);
+        color: var(--text-primary);
+        outline: none;
+        text-transform: uppercase;
+    }
+
+    .ticker-search-input:focus {
+        border-color: var(--navy);
+    }
+
+    .ticker-result {
+        background: var(--bg-primary);
+        border: 1px solid var(--border-light);
+        border-radius: 8px;
+        padding: 14px 16px;
+        margin-bottom: 8px;
+    }
+
+    /* ── News ── */
+    .news-item {
+        padding: 12px 0;
+        border-bottom: 1px solid var(--border-light);
+    }
+
+    .news-item:last-child { border-bottom: none; }
+
+    .news-headline {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 4px;
+        line-height: 1.4;
+    }
+
+    .news-meta {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+    }
+
+    .news-headline a {
+        color: var(--text-primary);
+        text-decoration: none;
+    }
+
+    .news-headline a:hover {
+        color: var(--navy);
+    }
+
+    /* ── Last updated ── */
+    .last-updated {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        text-align: right;
+        margin-bottom: 16px;
+    }
+
+    @media (max-width: 768px) {
+        .market-grid { grid-template-columns: 1fr !important; }
+
+        .holding-row {
+            grid-template-columns: 55px 1fr 70px 80px !important;
+        }
+
+        .holding-count { display: none; }
+    }
+</style>
+{% endblock %}
+
+{% block page_content %}
+
+<div class="last-updated" id="last-updated">
+    Loading market data...
+</div>
+
+<!-- ── Row 1: Indices + Treasury Rates ───────────────── -->
+<div class="market-grid">
+
+    <!-- Indices -->
+    <div class="market-card">
+        <div class="market-card-header">
+            <div class="market-card-title">📊 Major Indices</div>
+            <span style="font-size:0.68rem;color:rgba(255,255,255,0.5)">
+                15-min delayed
+            </span>
+        </div>
+        <div class="market-card-body" id="indices-body">
+            <div style="text-align:center;padding:20px;
+                        color:var(--text-muted);font-size:0.875rem">
+                ⏳ Loading...
+            </div>
+        </div>
+    </div>
+
+    <!-- Treasury Rates -->
+    <div class="market-card">
+        <div class="market-card-header">
+            <div class="market-card-title">🏛️ Treasury Yields</div>
+            <span style="font-size:0.68rem;color:rgba(255,255,255,0.5)">
+                FRED data
+            </span>
+        </div>
+        <div class="market-card-body" id="rates-body">
+            <div style="text-align:center;padding:20px;
+                        color:var(--text-muted);font-size:0.875rem">
+                ⏳ Loading...
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ── Row 2: Portfolio Holdings + Ticker Search ─────── -->
+<div class="market-grid">
+
+    <!-- Portfolio Holdings -->
+    <div class="market-card">
+        <div class="market-card-header">
+            <div class="market-card-title">💼 Your Portfolio Holdings</div>
+            <span style="font-size:0.68rem;color:rgba(255,255,255,0.5)">
+                {{ portfolio_instruments|length }} instruments across {{ client_count }} clients
+            </span>
+        </div>
+        <div class="market-card-body" id="holdings-body">
+            {% if portfolio_instruments %}
+            <div style="font-size:0.62rem;font-weight:700;color:var(--text-muted);
+                        text-transform:uppercase;letter-spacing:0.08em;
+                        margin-bottom:8px;display:grid;
+                        grid-template-columns:55px 1fr 50px 70px 80px;gap:8px">
+                <div>Ticker</div>
+                <div>Name</div>
+                <div style="text-align:center">Clients</div>
+                <div style="text-align:right">Price</div>
+                <div style="text-align:right">Change</div>
+            </div>
+            <div id="holdings-rows">
+                {% for inst in portfolio_instruments %}
+                <div class="holding-row" data-ticker="{{ inst.ticker }}">
+                    <div class="holding-ticker">{{ inst.ticker }}</div>
+                    <div class="holding-name">{{ inst.name[:25] }}</div>
+                    <div class="holding-count">{{ inst.count }}</div>
+                    <div class="holding-price" id="price-{{ inst.ticker }}">—</div>
+                    <div id="change-{{ inst.ticker }}" class="mover-change">—</div>
+                </div>
+                {% endfor %}
+            </div>
+                 {% else %}
+            <div style="text-align:center;padding:32px 20px">
+                <div style="font-size:2rem;opacity:0.2;margin-bottom:10px">💼</div>
+                <div style="font-size:0.875rem;font-weight:600;
+                            color:var(--text-secondary);margin-bottom:6px">
+                    No portfolio holdings yet
+                </div>
+                <div style="font-size:0.78rem;color:var(--text-muted);
+                            margin-bottom:16px;line-height:1.5">
+                    Generate and save recommendations for your clients
+                    to track their holdings here.
+                </div>
+                <a href="{{ url_for('main.portal') }}"
+                   class="btn btn-primary btn-sm">
+                    Generate First Recommendation
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Ticker Search + Top Gainers -->
+    <div class="market-card">
+        <div class="market-card-header">
+            <div class="market-card-title" id="research-title">🔍 Research Any Ticker</div>
+            <button id="back-btn"
+                    onclick="backToGainers()"
+                    style="display:none;font-size:0.72rem;
+                           color:rgba(255,255,255,0.7);
+                           background:none;border:none;
+                           cursor:pointer">
+                ← Back
+            </button>
+        </div>
+        <div class="market-card-body">
+
+            <!-- Search bar — always visible except chart view -->
+            <div class="ticker-search-wrap" id="search-wrap">
+                <input type="text"
+                       id="ticker-input"
+                       class="ticker-search-input"
+                       placeholder="Search ticker or company name..."
+                       autocomplete="off">
+            </div>
+
+            <!-- State 1: Top Gainers (default) -->
+            <div id="gainers-section">
+                <div style="font-size:0.65rem;font-weight:700;
+                            color:var(--text-muted);text-transform:uppercase;
+                            letter-spacing:0.08em;margin-bottom:8px">
+                    Top Movers Today
+                </div>
+                <div id="gainers-body">
+                    <div style="text-align:center;padding:20px;
+                                color:var(--text-muted);font-size:0.875rem">
+                        ⏳ Loading...
+                    </div>
+                </div>
+            </div>
+
+            <!-- State 2: Search Results -->
+            <div id="search-results" style="display:none"></div>
+
+            <!-- State 3: Chart View -->
+            <div id="chart-view" style="display:none"></div>
+
+        </div>
+    </div>
+</div>
+
+<!-- ── Row 3: Market News ─────────────────────────────── -->
+<div class="market-card" style="margin-bottom:20px">
+    <div class="market-card-header">
+        <div class="market-card-title">📰 Financial News</div>
+        <span style="font-size:0.68rem;color:rgba(255,255,255,0.5)">
+            Latest headlines
+        </span>
+    </div>
+    <div class="market-card-body" id="news-body">
+        <div style="text-align:center;padding:20px;
+                    color:var(--text-muted);font-size:0.875rem">
+            ⏳ Loading news...
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const TICKERS = {{ portfolio_instruments | map(attribute='ticker') | list | tojson }};
+let currentState = 'gainers'; // gainers | results | chart
+
+window.addEventListener('load', function() {
+    loadIndices();
+    loadRates();
+    loadNews();
+    loadGainers();
+    if (TICKERS.length > 0) loadHoldings();
+
+    const now = new Date();
+    document.getElementById('last-updated').textContent =
+        'Last updated: ' + now.toLocaleDateString('en-US', {
+            month: 'long', day: 'numeric', year: 'numeric'
+        }) + ' ' + now.toLocaleTimeString('en-US', {
+            hour: '2-digit', minute: '2-digit'
+        });
+
+    let searchTimer;
+    document.getElementById('ticker-input').addEventListener('input', function() {
+        clearTimeout(searchTimer);
+        const query = this.value.trim();
+        if (query.length < 2) {
+            document.getElementById('gainers-section').style.display = 'block';
+            document.getElementById('search-results').style.display  = 'none';
+            document.getElementById('back-btn').style.display        = 'none';
+            document.getElementById('research-title').textContent    = '🔍 Research Any Ticker';
+            currentState = 'gainers';
+            return;
+        }
+        searchTimer = setTimeout(searchTicker, 200);
+    });
+});
+
+// ── State Management ──────────────────────────────────────
+function showGainers() {
+    document.getElementById('gainers-section').style.display = 'block';
+    document.getElementById('search-results').style.display  = 'none';
+    document.getElementById('chart-view').style.display      = 'none';
+    document.getElementById('search-wrap').style.display     = 'flex';
+    document.getElementById('back-btn').style.display        = 'none';
+    document.getElementById('research-title').textContent    = '🔍 Research Any Ticker';
+    currentState = 'gainers';
+}
+
+function showResults(results) {
+    document.getElementById('gainers-section').style.display = 'none';
+    document.getElementById('search-results').style.display  = 'block';
+    document.getElementById('chart-view').style.display      = 'none';
+    document.getElementById('search-wrap').style.display     = 'flex';
+    document.getElementById('back-btn').style.display        = 'inline';
+    document.getElementById('research-title').textContent    = '🔍 Search Results';
+    currentState = 'results';
+
+    const container = document.getElementById('search-results');
+    if (results.length === 0) {
+        container.innerHTML = '<div style="padding:16px;color:var(--text-muted);font-size:0.875rem">No results found. Try a different search.</div>';
+        return;
+    }
+
+    container.innerHTML = results.map(r => `
+        <div onclick="showChart('${r.ticker}', '${r.name.replace(/'/g, '')}')"
+             style="display:flex;align-items:center;justify-content:space-between;
+                    padding:10px 0;border-bottom:1px solid var(--border-light);
+                    cursor:pointer;transition:background 0.15s"
+             onmouseover="this.style.background='var(--bg-primary)'"
+             onmouseout="this.style.background=''">
+            <div>
+                <div style="font-weight:700;color:var(--navy);font-size:0.875rem">
+                    ${r.ticker}
+                </div>
+                <div style="font-size:0.75rem;color:var(--text-muted)">${r.name}</div>
+            </div>
+            <div style="font-size:0.72rem;color:var(--text-muted)">${r.type} →</div>
+        </div>`).join('');
+}
+
+function showChart(ticker, name) {
+    document.getElementById('gainers-section').style.display = 'none';
+    document.getElementById('search-results').style.display  = 'none';
+    document.getElementById('chart-view').style.display      = 'block';
+    document.getElementById('search-wrap').style.display     = 'none';
+    document.getElementById('back-btn').style.display        = 'inline';
+    document.getElementById('research-title').textContent    = ticker + ' \u2014 ' + name;
+    currentState = 'chart';
+
+    const chartDiv = document.getElementById('chart-view');
+    chartDiv.innerHTML = `
+        <div style="margin-bottom:8px;font-size:0.72rem;color:var(--text-muted)">
+            Powered by TradingView
+        </div>
+        <div class="tradingview-widget-container" id="tv-container-${ticker}" style="height:380px">
+            <div id="tv-widget-${ticker}" style="height:380px"></div>
+        </div>`;
+
+    // Load TradingView widget script
+    const script = document.createElement('script');
+    script.src   = 'https://s3.tradingview.com/tv.js';
+    script.onload = function() {
+        new TradingView.widget({
+            container_id:   'tv-widget-' + ticker,
+            symbol:         ticker,
+            interval:       'D',
+            timezone:       'America/New_York',
+            theme:          'light',
+            style:          '1',
+            locale:         'en',
+            toolbar_bg:     '#f1f3f6',
+            enable_publishing: false,
+            hide_top_toolbar:  false,
+            hide_legend:       false,
+            save_image:        false,
+            height:            380,
+            width:             '100%'
+        });
+    };
+    document.head.appendChild(script);
+}
+
+function backToGainers() {
+    document.getElementById('ticker-input').value = '';
+    showGainers();
+}
+
+// ── Load Functions ────────────────────────────────────────
+function loadGainers() {
+    fetch('/market-watch-data', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({type: 'gainers'})
+    })
+    .then(r => r.json())
+    .then(data => {
+        const body = document.getElementById('gainers-body');
+        if (data.success && data.gainers) {
+            const gainers = data.gainers.filter(g => g.direction === 'up');
+    const losers  = data.gainers.filter(g => g.direction === 'down');
+
+    const renderRow = g => `
+        <div onclick="showChart('${g.ticker}', '${g.name.replace(/'/g, "").replace(/"/g, "")}')"
+             style="display:grid;grid-template-columns:52px 1fr 65px 55px;
+                    gap:8px;align-items:center;padding:8px 0;
+                    border-bottom:1px solid var(--border-light);
+                    cursor:pointer;font-size:0.8rem"
+             onmouseover="this.style.background='var(--bg-primary)'"
+             onmouseout="this.style.background=''">
+            <div style="font-weight:700;color:var(--navy)">${g.ticker}</div>
+            <div style="color:var(--text-secondary);font-size:0.75rem;
+                        white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                ${g.name}
+            </div>
+            <div style="text-align:right;font-weight:600">$${g.price}</div>
+            <div style="text-align:right;font-weight:700;font-size:0.75rem;
+                        padding:2px 6px;border-radius:4px;
+                        background:${g.direction === 'up' ? '#f0fff4' : '#fff5f5'};
+                        color:${g.direction === 'up' ? '#2d7d4f' : '#c53030'}">
+                ${g.change_pct > 0 ? '+' : ''}${g.change_pct}%
+            </div>
+        </div>`;
+
+    body.innerHTML =
+        '<div style="font-size:0.65rem;font-weight:700;color:#2d7d4f;' +
+        'text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">' +
+        '📈 Top Gainers</div>' +
+        gainers.map(renderRow).join('') +
+        '<div style="font-size:0.65rem;font-weight:700;color:#c53030;' +
+        'text-transform:uppercase;letter-spacing:0.08em;margin-top:12px;margin-bottom:4px">' +
+        '📉 Top Losers</div>' +
+        losers.map(renderRow).join('');
+        } else {
+            body.innerHTML = '<div style="padding:16px;color:var(--text-muted);font-size:0.875rem">Data unavailable.</div>';
+        }
+    })
+    .catch(() => {
+        document.getElementById('gainers-body').innerHTML =
+            '<div style="padding:16px;color:var(--text-muted);font-size:0.875rem">Data unavailable.</div>';
+    });
+}
+
+function searchTicker() {
+    const input = document.getElementById('ticker-input');
+    const query = input.value.trim();
+    if (!query) return;
+
+    const container = document.getElementById('search-results');
+    document.getElementById('gainers-section').style.display = 'none';
+    document.getElementById('search-results').style.display  = 'block';
+    document.getElementById('back-btn').style.display        = 'inline';
+    document.getElementById('research-title').textContent    = '🔍 Search Results';
+    container.innerHTML = '<div style="padding:16px;color:var(--text-muted);font-size:0.875rem">⏳ Searching...</div>';
+    currentState = 'results';
+
+    fetch('/market-watch-data', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({type: 'search', ticker: query})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success && data.matches) {
+            showResults(data.matches);
+        } else {
+            container.innerHTML = '<div style="padding:16px;color:var(--text-muted);font-size:0.875rem">No results found.</div>';
+        }
+    })
+    .catch(() => {
+        container.innerHTML = '<div style="padding:16px;color:var(--error);font-size:0.875rem">Search failed. Please try again.</div>';
+    });
+}
+
+function loadIndices() {
+    fetch('/market-watch-data', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({type: 'indices'})
+    })
+    .then(r => r.json())
+    .then(data => {
+        const body = document.getElementById('indices-body');
+        if (data.success && data.indices) {
+            body.innerHTML = data.indices.map(idx => `
+                <div class="index-row">
+                    <div>
+                        <div class="index-name">${idx.name}</div>
+                        <div class="index-ticker">${idx.ticker}</div>
+                    </div>
+                    <div class="index-price">
+                        <div class="index-value">${idx.price}</div>
+                        <div class="index-change ${idx.direction}">
+                            ${idx.change} (${idx.change_pct}%)
+                        </div>
+                    </div>
+                </div>`).join('');
+        } else {
+            body.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted)">Data unavailable.</div>';
+        }
+    })
+    .catch(() => {
+        document.getElementById('indices-body').innerHTML =
+            '<div style="text-align:center;padding:20px;color:var(--text-muted)">Data unavailable.</div>';
+    });
+}
+
+function loadRates() {
+    fetch('/market-watch-data', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({type: 'rates'})
+    })
+    .then(r => r.json())
+    .then(data => {
+        const body = document.getElementById('rates-body');
+        if (data.success && data.rates) {
+            body.innerHTML = data.rates.map(r => `
+                <div class="rate-row">
+                    <div class="rate-label">${r.label}</div>
+                    <div class="rate-value">${r.value}%</div>
+                </div>`).join('');
+        } else {
+            body.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted)">Data unavailable.</div>';
+        }
+    })
+    .catch(() => {
+        document.getElementById('rates-body').innerHTML =
+            '<div style="text-align:center;padding:20px;color:var(--text-muted)">Data unavailable.</div>';
+    });
+}
+
+function loadHoldings() {
+    fetch('/market-watch-data', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({type: 'holdings', tickers: TICKERS})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success && data.prices) {
+            TICKERS.forEach(ticker => {
+                const priceEl  = document.getElementById('price-' + ticker);
+                const changeEl = document.getElementById('change-' + ticker);
+                const info     = data.prices[ticker];
+                if (info && priceEl && changeEl) {
+                    priceEl.textContent = '$' + info.price;
+                    changeEl.textContent = (info.change_pct > 0 ? '+' : '') + info.change_pct + '%';
+                    changeEl.className  = 'mover-change ' + (info.change_pct > 0 ? 'up' : info.change_pct < 0 ? 'down' : '');
+                }
+            });
+        }
+    })
+    .catch(() => {});
+}
+
+function loadNews() {
+    fetch('/market-watch-data', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({type: 'news'})
+    })
+    .then(r => r.json())
+    .then(data => {
+        const body = document.getElementById('news-body');
+        if (data.success && data.news && data.news.length > 0) {
+            body.innerHTML = data.news.map(item => `
+                <div class="news-item">
+                    <div class="news-headline">
+                        <a href="${item.link}" target="_blank">${item.title}</a>
+                    </div>
+                    <div class="news-meta">${item.source} · ${item.date}</div>
+                </div>`).join('');
+        } else {
+            body.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted)">News unavailable.</div>';
+        }
+    })
+    .catch(() => {
+        document.getElementById('news-body').innerHTML =
+            '<div style="text-align:center;padding:20px;color:var(--text-muted)">News unavailable.</div>';
+    });
+}
+</script>
+{% endblock %}

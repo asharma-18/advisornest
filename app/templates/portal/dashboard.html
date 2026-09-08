@@ -21,7 +21,7 @@
 <style>
     .stats-row {
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(3, 1fr);
         gap: 16px;
         margin-bottom: 28px;
     }
@@ -277,7 +277,7 @@
         <a href="{{ url_for('main.notes') }}"
            class="action-card-link">View Notes →</a>
     </div>
-       
+
     <div class="action-card">
         <div class="action-card-icon"
              style="background:#fff8ee">📋</div>
@@ -289,8 +289,20 @@
         <a href="{{ url_for('main.meeting_prep_landing') }}"
            class="action-card-link">Prepare Now →</a>
     </div>
-</div>
 
+    <div class="action-card">
+        <div class="action-card-icon"
+             style="background:#edfaf1">📈</div>
+        <div class="action-card-title">Market Watch</div>
+        <div class="action-card-desc">
+            Track major indices, treasury yields,
+            top movers and financial news in real time
+        </div>
+        <a href="{{ url_for('main.market_watch') }}"
+           class="action-card-link">Open Market Watch →</a>
+    </div>
+
+</div>
 <!-- Getting Started -->
 <div class="section-label">Getting Started</div>
 
