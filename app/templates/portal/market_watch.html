@@ -505,7 +505,13 @@ function showChart(ticker, name) {
         <div style="margin-bottom:8px;font-size:0.72rem;color:var(--text-muted)">
             Powered by TradingView
         </div>
-        <div class="tradingview-widget-container" id="tv-container-${ticker}" style="height:380px">
+        <div style="height:380px;background:var(--bg-primary);border-radius:8px;
+                    display:flex;align-items:center;justify-content:center;
+                    color:var(--text-muted);font-size:0.875rem"
+             id="chart-loading-${ticker}">
+            ⏳ Loading chart...
+        </div>
+        <div class="tradingview-widget-container" id="tv-container-${ticker}" style="height:380px;display:none">
             <div id="tv-widget-${ticker}" style="height:380px"></div>
         </div>`;
 
@@ -513,6 +519,11 @@ function showChart(ticker, name) {
     const script = document.createElement('script');
     script.src   = 'https://s3.tradingview.com/tv.js';
     script.onload = function() {
+        const loading = document.getElementById('chart-loading-' + ticker);
+        const container = document.getElementById('tv-container-' + ticker);
+        if (loading) loading.style.display = 'none';
+        if (container) container.style.display = 'block';
+
         new TradingView.widget({
             container_id:   'tv-widget-' + ticker,
             symbol:         ticker,
