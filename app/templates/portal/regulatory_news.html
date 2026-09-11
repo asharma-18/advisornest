@@ -1,0 +1,447 @@
+{% extends "base.html" %}
+
+{% block title %}Regulatory News — AdvisorNest{% endblock %}
+{% block page_title %}Regulatory News{% endblock %}
+{% block page_subtitle %}Stay current on SEC and FINRA updates{% endblock %}
+
+{% block extra_css %}
+<style>
+    .reg-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-bottom: 20px;
+    }
+
+    .reg-card {
+        background: white;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .reg-card-header {
+        background: var(--navy);
+        padding: 12px 18px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .reg-card-title {
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: white;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+    }
+
+    .reg-card-header-right {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .reg-card-updated {
+        font-size: 0.62rem;
+        color: rgba(255,255,255,0.45);
+        white-space: nowrap;
+    }
+
+    .reg-card-body {
+        padding: 18px;
+    }
+
+    .reg-item {
+        padding: 12px 0;
+        border-bottom: 1px solid var(--border-light);
+    }
+
+    .reg-item:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+    }
+
+    .reg-item-title {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 4px;
+        line-height: 1.4;
+    }
+
+    .reg-item-title a {
+        color: var(--text-primary);
+        text-decoration: none;
+    }
+
+    .reg-item-title a:hover {
+        color: var(--navy);
+        text-decoration: underline;
+    }
+
+    .reg-item-meta {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+    }
+
+    .reg-badge {
+        display: inline-block;
+        font-size: 0.62rem;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 10px;
+        margin-right: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+    }
+
+    .reg-badge.sec   { background:#eef2f7; color:var(--navy); }
+    .reg-badge.finra { background:#fff8ee; color:#b7791f; }
+    .reg-badge.enf   { background:#fff5f5; color:#c53030; }
+
+    .compliance-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--border-light);
+        text-decoration: none;
+        transition: background 0.15s;
+    }
+
+    .compliance-item:hover {
+        background: var(--bg-primary);
+        margin: 0 -18px;
+        padding: 12px 18px;
+    }
+
+    .compliance-item:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+    }
+
+    .compliance-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: var(--bg-tertiary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        flex-shrink: 0;
+    }
+
+    .compliance-title {
+        font-size: 0.825rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 3px;
+    }
+
+    .compliance-date {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+    }
+
+    .disclaimer {
+        background: var(--bg-primary);
+        border: 1px solid var(--border-light);
+        border-radius: 8px;
+        padding: 12px 16px;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        margin-bottom: 20px;
+        line-height: 1.5;
+    }
+
+    @media (max-width: 768px) {
+        .reg-grid { grid-template-columns: 1fr !important; }
+    }
+</style>
+{% endblock %}
+
+{% block page_content %}
+
+<div class="disclaimer">
+    ⚠️ This page aggregates public regulatory updates from SEC.gov and FINRA.org for informational purposes only.
+    Always verify compliance requirements with your compliance officer or legal counsel.
+</div>
+
+<!-- ── Row 1: SEC + FINRA ─────────────────────────────── -->
+<div class="reg-grid">
+
+    <!-- SEC Updates -->
+    <div class="reg-card">
+        <div class="reg-card-header">
+            <div class="reg-card-title">🏛️ SEC Updates</div>
+            <div class="reg-card-header-right">
+                <span id="sec-updated" class="reg-card-updated"></span>
+                <a href="https://www.sec.gov/newsroom/press-releases" target="_blank"
+                   style="font-size:0.68rem;color:rgba(255,255,255,0.6)">
+                    sec.gov →
+                </a>
+            </div>
+        </div>
+        <div class="reg-card-body" id="sec-body">
+            <div style="text-align:center;padding:20px;
+                        color:var(--text-muted);font-size:0.875rem">
+                ⏳ Loading SEC updates...
+            </div>
+        </div>
+    </div>
+
+    <!-- FINRA Notices -->
+    <div class="reg-card">
+        <div class="reg-card-header">
+            <div class="reg-card-title">📋 FINRA Notices</div>
+            <div class="reg-card-header-right">
+                <span id="finra-updated" class="reg-card-updated"></span>
+                <a href="https://www.finra.org/rules-guidance/notices" target="_blank"
+                   style="font-size:0.68rem;color:rgba(255,255,255,0.6)">
+                    finra.org →
+                </a>
+            </div>
+        </div>
+        <div class="reg-card-body" id="finra-body">
+            <div style="text-align:center;padding:20px;
+                        color:var(--text-muted);font-size:0.875rem">
+                ⏳ Loading FINRA notices...
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ── Row 2: Enforcement + Compliance Calendar ───────── -->
+<div class="reg-grid">
+
+    <!-- Enforcement Actions -->
+    <div class="reg-card">
+        <div class="reg-card-header">
+            <div class="reg-card-title">⚖️ Enforcement Actions</div>
+            <div class="reg-card-header-right">
+                <span id="enforcement-updated" class="reg-card-updated"></span>
+                <a href="https://www.sec.gov/enforcement-litigation/litigation-releases"
+                   target="_blank"
+                   style="font-size:0.68rem;color:rgba(255,255,255,0.6)">
+                    View all →
+                </a>
+            </div>
+        </div>
+        <div class="reg-card-body" id="enforcement-body">
+            <div style="text-align:center;padding:20px;
+                        color:var(--text-muted);font-size:0.875rem">
+                ⏳ Loading enforcement actions...
+            </div>
+        </div>
+    </div>
+
+    <!-- Compliance Calendar -->
+    <div class="reg-card">
+        <div class="reg-card-header">
+            <div class="reg-card-title">📅 Compliance Calendar</div>
+            <span style="font-size:0.68rem;color:rgba(255,255,255,0.5)">
+                Key dates for RIAs
+            </span>
+        </div>
+        <div class="reg-card-body">
+
+            <a href="https://www.sec.gov/about/divisions-offices/division-investment-management/electronic-filing-investment-advisers-iard"
+               target="_blank" class="compliance-item">
+                <div class="compliance-icon">📝</div>
+                <div>
+                    <div class="compliance-title">Form ADV Annual Amendment</div>
+                    <div class="compliance-date">Due within 90 days of fiscal year end</div>
+                </div>
+            </a>
+
+            <a href="https://www.sec.gov/newsroom/press-releases/2024-17" target="_blank"
+               class="compliance-item">
+                <div class="compliance-icon">📊</div>
+                <div>
+                    <div class="compliance-title">Form PF Filing</div>
+                    <div class="compliance-date">Required for large private fund advisers</div>
+                </div>
+            </a>
+
+            <a href="https://www.sec.gov/rules-regulations/2003/12/compliance-programs-investment-companies-investment-advisers"
+               target="_blank" class="compliance-item">
+                <div class="compliance-icon">🔍</div>
+                <div>
+                    <div class="compliance-title">Annual Compliance Review</div>
+                    <div class="compliance-date">Required annually under SEC Rule 206(4)-7</div>
+                </div>
+            </a>
+
+            <a href="https://www.sec.gov/rules-regulations/2002/07/custody-funds-or-securities-clients-investment-advisers"
+               target="_blank" class="compliance-item">
+                <div class="compliance-icon">📧</div>
+                <div>
+                    <div class="compliance-title">Client Statement Delivery</div>
+                    <div class="compliance-date">Quarterly account statements required</div>
+                </div>
+            </a>
+
+            <a href="https://www.sec.gov/resources-small-businesses/small-business-compliance-guides/form-crs-relationship-summary-amendments-form-adv"
+               target="_blank" class="compliance-item">
+                <div class="compliance-icon">⚠️</div>
+                <div>
+                    <div class="compliance-title">Form CRS Delivery</div>
+                    <div class="compliance-date">Required for new clients and annually</div>
+                </div>
+            </a>
+
+            <a href="https://www.ecfr.gov/current/title-17/chapter-II/part-275/section-275.204-2"
+               target="_blank" class="compliance-item">
+                <div class="compliance-icon">💼</div>
+                <div>
+                    <div class="compliance-title">Books & Records Review</div>
+                    <div class="compliance-date">Ongoing — 5 year retention required</div>
+                </div>
+            </a>
+
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let secCachedAt = null;
+let finraCachedAt = null;
+let enforcementCachedAt = null;
+
+window.addEventListener('load', function() {
+    loadSEC();
+    loadFINRA();
+    loadEnforcement();
+
+    setInterval(function() {
+        if (secCachedAt) document.getElementById('sec-updated').textContent = formatRelativeTime(secCachedAt);
+        if (finraCachedAt) document.getElementById('finra-updated').textContent = formatRelativeTime(finraCachedAt);
+        if (enforcementCachedAt) document.getElementById('enforcement-updated').textContent = formatRelativeTime(enforcementCachedAt);
+    }, 30000);
+});
+
+function formatRelativeTime(unixSeconds) {
+    const diffMin = Math.floor((Date.now() / 1000 - unixSeconds) / 60);
+    if (diffMin < 1) return "Updated just now";
+    if (diffMin === 1) return "Updated 1 min ago";
+    if (diffMin < 60) return `Updated ${diffMin} min ago`;
+    const diffHr = Math.floor(diffMin / 60);
+    return diffHr === 1 ? "Updated 1 hr ago" : `Updated ${diffHr} hrs ago`;
+}
+
+function loadSEC() {
+    fetch('/regulatory-news-data', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({type: 'sec'})
+    })
+    .then(r => r.json())
+    .then(data => {
+        const body = document.getElementById('sec-body');
+        if (data.success && data.items && data.items.length > 0) {
+            body.innerHTML = data.items.map(item => `
+                <div class="reg-item">
+                    <div class="reg-item-title">
+                        <a href="${item.link}" target="_blank">${item.title}</a>
+                    </div>
+                    <div class="reg-item-meta">
+                        <span class="reg-badge sec">SEC</span>
+                        ${item.date}
+                    </div>
+                </div>`).join('');
+            secCachedAt = data.cached_at;
+            document.getElementById('sec-updated').textContent = formatRelativeTime(secCachedAt);
+        } else {
+            body.innerHTML = unavailable('SEC', 'https://www.sec.gov/newsroom/press-releases');
+        }
+    })
+    .catch(() => {
+        document.getElementById('sec-body').innerHTML =
+            unavailable('SEC', 'https://www.sec.gov/newsroom/press-releases');
+    });
+}
+
+function loadFINRA() {
+    fetch('/regulatory-news-data', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({type: 'finra'})
+    })
+    .then(r => r.json())
+    .then(data => {
+        const body = document.getElementById('finra-body');
+        if (data.success && data.items && data.items.length > 0) {
+            body.innerHTML = data.items.map(item => `
+                <div class="reg-item">
+                    <div class="reg-item-title">
+                        <a href="${item.link}" target="_blank">${item.title}</a>
+                    </div>
+                    <div class="reg-item-meta">
+                        <span class="reg-badge finra">FINRA</span>
+                        ${item.date}
+                    </div>
+                </div>`).join('');
+            finraCachedAt = data.cached_at;
+            document.getElementById('finra-updated').textContent = formatRelativeTime(finraCachedAt);
+        } else {
+            body.innerHTML = unavailable('FINRA', 'https://www.finra.org/rules-guidance/notices');
+        }
+    })
+    .catch(() => {
+        document.getElementById('finra-body').innerHTML =
+            unavailable('FINRA', 'https://www.finra.org/rules-guidance/notices');
+    });
+}
+
+function loadEnforcement() {
+    fetch('/regulatory-news-data', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({type: 'enforcement'})
+    })
+    .then(r => r.json())
+    .then(data => {
+        const body = document.getElementById('enforcement-body');
+        if (data.success && data.items && data.items.length > 0) {
+            body.innerHTML = data.items.map(item => `
+                <div class="reg-item">
+                    <div class="reg-item-title">
+                        <a href="${item.link}" target="_blank">${item.title}</a>
+                    </div>
+                    <div class="reg-item-meta">
+                        <span class="reg-badge enf">Enforcement</span>
+                        ${item.date}
+                    </div>
+                </div>`).join('');
+            enforcementCachedAt = data.cached_at;
+            document.getElementById('enforcement-updated').textContent = formatRelativeTime(enforcementCachedAt);
+        } else {
+            body.innerHTML = unavailable('Enforcement', 'https://www.sec.gov/enforcement-litigation/litigation-releases');
+        }
+    })
+    .catch(() => {
+        document.getElementById('enforcement-body').innerHTML =
+            unavailable('Enforcement', 'https://www.sec.gov/enforcement-litigation/litigation-releases');
+    });
+}
+
+function unavailable(source, link) {
+    return `<div style="text-align:center;padding:20px;
+                color:var(--text-muted);font-size:0.875rem;line-height:1.8">
+                ${source} data temporarily unavailable.<br>
+                <a href="${link}" target="_blank"
+                   class="btn btn-ghost btn-sm"
+                   style="margin-top:10px;display:inline-block">
+                    View on official site →
+                </a>
+            </div>`;
+}
+</script>
+{% endblock %}

@@ -298,8 +298,20 @@
             Track major indices, treasury yields,
             top movers and financial news in real time
         </div>
-        <a href="{{ url_for('main.market_watch') }}"
+                <a href="{{ url_for('main.market_watch') }}"
            class="action-card-link">Open Market Watch →</a>
+    </div>
+
+    <div class="action-card">
+        <div class="action-card-icon"
+             style="background:#fff0f0">⚖️</div>
+        <div class="action-card-title">Regulatory News</div>
+        <div class="action-card-desc">
+            Stay current on SEC and FINRA updates,
+            enforcement actions and compliance changes
+        </div>
+        <a href="{{ url_for('main.regulatory_news') }}"
+           class="action-card-link">View Updates →</a>
     </div>
 
 </div>

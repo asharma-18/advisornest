@@ -13,7 +13,67 @@ from ai_logic import generate_ai_recommendation, get_fallback_recommendation, ge
 from pdf_generator import generate_pdf_report
 from flask import send_file
 import json
+import threading
+import time
+import feedparser
+import requests as req
 
+CACHE_TTL_SECONDS = 1800  # 30 minutes
+
+_feed_cache = {}
+_cache_lock = threading.Lock()
+
+SEC_HEADERS = {
+    "User-Agent": "AdvisorNest advisornest.app@gmail.com    b ",
+    "Accept-Encoding": "gzip, deflate"
+}
+
+
+def _fetch_feed(url, headers=None, limit=8):
+    resp = req.get(url, headers=headers, timeout=8)
+    if resp.status_code == 429:
+        print(f"SEC rate limit hit (429) for {url}")
+    elif resp.status_code == 403:
+        print(f"SEC blocked request (403) for {url} — check User-Agent or IP block")
+    resp.raise_for_status()
+    feed = feedparser.parse(resp.content)
+    items = []
+    for entry in feed.entries[:limit]:
+        title = entry.get("title", "").strip()
+        link  = entry.get("link", "#")
+        date  = entry.get("published", "")[:16] if entry.get("published") else ""
+        if title and len(title) > 5:
+            items.append({"title": title, "link": link, "date": date})
+    return items
+
+
+def _get_cached_feed(cache_key, fetch_fn):
+    """
+    Returns a list of items for the given feed, using a shared
+    in-memory cache with a TTL. If a fresh fetch fails but a stale
+    cached copy exists, the stale copy is served instead of nothing.
+    """
+    now = time.time()
+
+    with _cache_lock:
+        cached = _feed_cache.get(cache_key)
+
+    if cached and (now - cached["timestamp"]) < CACHE_TTL_SECONDS:
+        print(f"[CACHE HIT] {cache_key} ({int(now - cached['timestamp'])}s old)")
+        return cached["items"], cached["timestamp"]
+    print(f"[CACHE MISS] {cache_key} — fetching live")
+    try:
+        items = fetch_fn()
+        with _cache_lock:
+            _feed_cache[cache_key] = {"items": items, "timestamp": now}
+        return items, now
+    except Exception as e:
+        print(f"{cache_key} fetch error: {str(e)}")
+        if cached:
+            print(f"Serving stale {cache_key} cache due to fetch failure")
+            return cached["items"], cached["timestamp"]
+
+        raise
 main = Blueprint("main", __name__)
 
 
@@ -796,7 +856,54 @@ def market_watch():
         portfolio_instruments=portfolio_instruments,
         client_count=len(all_clients))
 
-# ── Market Watch Data ─────────────────────────────────────
+# ── Regulatory News ───────────────────────────────────────
+@main.route("/regulatory-news")
+def regulatory_news():
+    if not session.get("logged_in"):
+        flash("Please log in to continue.", "info")
+        return redirect(url_for("main.login"))
+
+    return render_template("portal/regulatory_news.html",
+        advisor=session.get("advisor"))
+
+# ── Regulatory News Data ──────────────────────────────────
+@main.route("/regulatory-news-data", methods=["POST"])
+def regulatory_news_data():
+    if not session.get("logged_in"):
+        return json.dumps({"success": False})
+
+    data      = request.get_json()
+    data_type = data.get("type", "")
+
+    try:
+        if data_type == "sec":
+            items, cached_at = _get_cached_feed(
+                "sec",
+                lambda: _fetch_feed("https://www.sec.gov/news/pressreleases.rss", headers=SEC_HEADERS)
+            )
+            return json.dumps({"success": True, "items": items, "cached_at": cached_at})
+
+        elif data_type == "finra":
+            items, cached_at = _get_cached_feed(
+                "finra",
+                lambda: _fetch_feed("https://www.finra.org/rules-guidance/notices/rss")
+            )
+            return json.dumps({"success": True, "items": items, "cached_at": cached_at})
+
+        elif data_type == "enforcement":
+            items, cached_at = _get_cached_feed(
+                "enforcement",
+                lambda: _fetch_feed("https://www.sec.gov/enforcement-litigation/litigation-releases/rss", headers=SEC_HEADERS)
+            )
+            return json.dumps({"success": True, "items": items, "cached_at": cached_at})
+
+        return json.dumps({"success": False})
+
+    except Exception as e:
+        print(f"Regulatory news error: {str(e)}")
+        return json.dumps({"success": False})
+
+# ── Market Watch Data
 @main.route("/market-watch-data", methods=["POST"])
 def market_watch_data():
     if not session.get("logged_in"):
