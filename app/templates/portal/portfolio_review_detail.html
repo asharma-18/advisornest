@@ -1,0 +1,290 @@
+{% extends "base.html" %}
+
+{% block title %}{{ client.client_name }} — Portfolio Review — AdvisorNest{% endblock %}
+{% block page_title %}{{ client.client_name }}{% endblock %}
+{% block page_subtitle %}Portfolio review{% endblock %}
+
+{% block extra_css %}
+<style>
+    .back-link { font-size: 0.8rem; color: var(--text-muted); text-decoration: none; margin-bottom: 12px; display: inline-block; }
+    .back-link:hover { color: var(--navy); }
+
+    .client-info-strip {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 16px;
+        background: white;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px 20px;
+        margin-bottom: 20px;
+    }
+
+    .client-info-label {
+        font-size: 0.68rem;
+        font-weight: 700;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: 4px;
+    }
+
+    .client-info-value {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+
+    .review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+    .review-card { background: white; border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+    .review-card-title { font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 12px; }
+
+    .drift-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.825rem;
+    }
+
+    .drift-table th {
+        text-align: left;
+        font-size: 0.68rem;
+        font-weight: 700;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .drift-table td {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--border-light);
+        color: var(--text-primary);
+    }
+
+    .drift-table tr:last-child td { border-bottom: none; }
+
+    .drift-up { color: #c53030; font-weight: 600; }
+    .drift-down { color: #2d7d4f; font-weight: 600; }
+
+    .action-sell { color: #c53030; font-weight: 600; }
+    .action-buy  { color: #2d7d4f; font-weight: 600; }
+    .action-hold { color: var(--text-muted); }
+
+    .perf-note { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 8px; }
+        .action-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--border-light);
+        font-size: 0.85rem;
+    }
+    .action-item:last-child { border-bottom: none; }
+    .action-badge {
+        font-size: 0.68rem;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        flex-shrink: 0;
+    }
+    .action-badge-sell { background:#fff5f5; color:#c53030; }
+    .action-badge-buy  { background:#edf7f1; color:#2d7d4f; }
+    .action-text { color: var(--text-primary); }
+    .empty-state { text-align: center; padding: 30px 20px; color: var(--text-muted); font-size: 0.875rem; }
+
+    @media (max-width: 768px) {
+        .review-grid { grid-template-columns: 1fr !important; }
+        .client-info-strip { grid-template-columns: repeat(2, 1fr) !important; }
+    }
+</style>
+{% endblock %}
+
+{% block page_content %}
+
+<a href="{{ url_for('main.portfolio_review') }}" class="back-link">← Back to portfolio review</a>
+
+<div class="client-info-strip">
+    <div class="client-info-item">
+        <div class="client-info-label">Age</div>
+        <div class="client-info-value">{{ client.age }}</div>
+    </div>
+    <div class="client-info-item">
+        <div class="client-info-label">Life Stage</div>
+        <div class="client-info-value">{{ client.life_stage }}</div>
+    </div>
+    <div class="client-info-item">
+        <div class="client-info-label">Risk Tolerance</div>
+        <div class="client-info-value">{{ client.risk }}</div>
+    </div>
+    <div class="client-info-item">
+        <div class="client-info-label">Time Horizon</div>
+        <div class="client-info-value">{{ client.horizon }} yrs</div>
+    </div>
+    <div class="client-info-item">
+        <div class="client-info-label">Total Invested</div>
+        <div class="client-info-value">${{ "{:,}".format(client.amount) }}</div>
+    </div>
+</div>
+
+<div id="detail-body">
+    <div class="empty-state">⏳ Loading portfolio data...</div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+Chart.defaults.animation = false;
+window.addEventListener('load', function() {
+    fetch('/portfolio-review-detail-data/{{ client.id }}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'}
+    })
+    .then(r => r.json())
+    .then(data => {
+        const container = document.getElementById('detail-body');
+
+        if (!data.success) {
+            container.innerHTML = `<div class="empty-state">${data.message || 'No portfolio data available for this client yet.'}</div>`;
+            return;
+        }
+
+        container.innerHTML = `
+            <div class="review-grid">
+                <div class="review-card">
+                    <div class="review-card-title">Target vs Current Allocation</div>
+                    <div style="position:relative;height:240px">
+                        <canvas id="allocChart"></canvas>
+                    </div>
+                </div>
+                <div class="review-card">
+                    <div class="review-card-title">Drift by Category</div>
+                    <div style="position:relative;height:240px">
+                        <canvas id="driftChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="review-card" style="margin-bottom:20px">
+                <div class="review-card-title">Drift Detail</div>
+                <div style="overflow-x:auto"><table class="drift-table">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th>Target</th>
+                            <th>Current</th>
+                            <th>Drift</th>
+                            <th>Amount</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="drift-table-body"></tbody>
+                </table></div>
+            </div>
+             <div class="review-card" style="margin-bottom:20px">
+                <div class="review-card-title">Rebalancing Action Plan</div>
+                <div id="action-plan-body"></div>
+            </div>
+            <div class="review-card">
+                <div class="review-card-title">Portfolio Value Over Time</div>
+                <div id="perf-container"></div>
+            </div>
+        `;
+
+        const labels = data.drift.map(d => d.category);
+
+        const categoryColors = ['#2c4a6e', '#1d9e75', '#c9a227', '#7c5cbf', '#d1495b'];
+
+new Chart(document.getElementById('allocChart'), {
+    type: 'doughnut',
+    data: {
+        labels: labels,
+        datasets: [
+            { label: 'Target', data: data.drift.map(d => d.target_pct), backgroundColor: categoryColors },
+            { label: 'Current', data: data.drift.map(d => d.current_pct), backgroundColor: categoryColors }
+        ]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return `${context.dataset.label}: ${context.parsed}% of portfolio`;
+                    }
+                }
+            }
+        }
+    }
+});
+
+        new Chart(document.getElementById('driftChart'), {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{ label: 'Drift %', data: data.drift.map(d => d.drift_pct), backgroundColor: '#c9a227' }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { y: { ticks: { callback: v => v + '%' } } }
+            }
+        });
+
+        const driftTableBody = document.getElementById('drift-table-body');
+        driftTableBody.innerHTML = data.drift.map(d => `
+            <tr>
+                <td>${d.category}</td>
+                <td>${d.target_pct}%</td>
+                <td>${d.current_pct}%</td>
+                <td class="${d.drift_pct > 0 ? 'drift-up' : d.drift_pct < 0 ? 'drift-down' : ''}">${d.drift_pct > 0 ? '+' : ''}${d.drift_pct}%</td>
+                <td>$${Math.abs(d.drift_amt).toLocaleString()}</td>
+                <td class="action-${d.action_type}">${d.action}</td>
+            </tr>`).join('');
+        const actionPlanBody = document.getElementById('action-plan-body');
+        if (data.rebalance_actions && data.rebalance_actions.length > 0) {
+            actionPlanBody.innerHTML = data.rebalance_actions.map(a => `
+                <div class="action-item">
+                    <span class="action-badge action-badge-${a.action_type}">${a.action_type === 'sell' ? 'Trim' : 'Add'}</span>
+                    <span class="action-text">${a.detail} in ${a.category}${a.largest_holding ? ` — largest holding: ${a.largest_holding}` : ''}</span>
+                </div>`).join('');
+        } else {
+                        actionPlanBody.innerHTML = `<div class="perf-note">No rebalancing needed — every category is within the 5% threshold.</div>`;
+        }
+
+        const perfContainer = document.getElementById('perf-container');
+        if (data.snapshots && data.snapshots.length >= 3) {
+            perfContainer.innerHTML = `<div style="position:relative;height:220px"><canvas id="perfChart"></canvas></div>`;
+            new Chart(document.getElementById('perfChart'), {
+                type: 'line',
+                data: {
+                    labels: data.snapshots.map(s => s.snapshot_date),
+                    datasets: [{
+                        label: 'Portfolio Value',
+                        data: data.snapshots.map(s => s.total_value),
+                        borderColor: '#2c4a6e',
+                        backgroundColor: 'rgba(44,74,110,0.08)',
+                        fill: true, tension: 0.3, pointRadius: 3
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { ticks: { callback: v => '$' + v.toLocaleString() } } }
+                }
+            });
+        } else {
+            perfContainer.innerHTML = `<div class="perf-note">Building history — check back in a few days. AdvisorNest records this client's portfolio value automatically each time it's reviewed.</div>`;
+        }
+    })
+    .catch(() => {
+        document.getElementById('detail-body').innerHTML =
+            '<div class="empty-state">Could not load portfolio data. Please try again.</div>';
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block title %}Portfolio Review — AdvisorNest{% endblock %}
+{% block page_title %}Portfolio Review{% endblock %}
+{% block page_subtitle %}See which clients need a rebalancing conversation{% endblock %}
+
+{% block extra_css %}
+<style>
+    .review-updated { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 16px; }
+    .review-list { background: white; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+    .review-row {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 16px 20px; border-bottom: 1px solid var(--border-light);
+        text-decoration: none; transition: background 0.15s;
+    }
+    .review-row:hover { background: var(--bg-primary); }
+    .review-row:last-child { border-bottom: none; }
+    .review-name { font-size: 0.9rem; font-weight: 600; color: var(--text-primary); }
+    .review-status { display: flex; align-items: center; gap: 10px; }
+    .status-badge {
+        font-size: 0.7rem; font-weight: 700; padding: 4px 12px;
+        border-radius: 12px; text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .status-badge.needs_rebalancing { background:#fff5f5; color:#c53030; }
+    .status-badge.on_target        { background:#edf7f1; color:#2d7d4f; }
+    .status-badge.no_data          { background:var(--bg-tertiary); color:var(--text-muted); }
+    .status-badge.error            { background:#fff8ee; color:#b7791f; }
+    .drift-amount { font-size: 0.8rem; color: var(--text-muted); min-width: 60px; text-align: right; }
+    .empty-state { text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: 0.875rem; }
+.client-search-input {
+    width: 100%;
+    padding: 10px 16px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.875rem;
+    margin-bottom: 16px;
+    box-sizing: border-box;
+}
+.client-search-input:focus {
+    outline: none;
+    border-color: var(--navy);
+}
+.mobile-only-header { display: none; }
+@media (max-width: 768px) {
+    .mobile-only-header { display: block !important; }
+}
+</style>
+{% endblock %}
+
+{% block page_content %}
+
+<div class="section-header mobile-only-header">
+    <div>
+        <h1 class="section-title">Portfolio Review</h1>
+        <p class="section-subtitle">See which clients need a rebalancing conversation</p>
+    </div>
+</div>
+
+<div class="review-updated" id="review-updated"></div>
+<input type="text" id="client-search" class="client-search-input" placeholder="Search clients by name...">
+<div class="review-list" id="review-list">
+    <div class="empty-state">⏳ Checking client portfolios...</div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function formatRelativeTime(unixSeconds) {
+    const diffMin = Math.floor((Date.now() / 1000 - unixSeconds) / 60);
+    if (diffMin < 1) return "Updated just now";
+    if (diffMin === 1) return "Updated 1 min ago";
+    if (diffMin < 60) return `Updated ${diffMin} min ago`;
+    const diffHr = Math.floor(diffMin / 60);
+    return diffHr === 1 ? "Updated 1 hr ago" : `Updated ${diffHr} hrs ago`;
+}
+
+const statusLabels = {
+    needs_rebalancing: "Needs Rebalancing",
+    on_target: "On Target",
+    no_data: "No Data",
+    error: "Error"
+};
+
+window.addEventListener('load', loadReview);
+
+function loadReview() {
+    fetch('/portfolio-review-data', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'}
+    })
+    .then(r => r.json())
+    .then(data => {
+        const list = document.getElementById('review-list');
+
+        if (!data.success || !data.clients || data.clients.length === 0) {
+            list.innerHTML = '<div class="empty-state">No clients yet — save a recommendation to see it here.</div>';
+            return;
+        }
+
+        allClients = data.clients;
+        renderClientList(allClients);
+
+        if (data.clients.length > 0 && data.clients[0].cached_at) {
+            document.getElementById('review-updated').textContent =
+                formatRelativeTime(data.clients[0].cached_at);
+        }
+    })
+    .catch(() => {
+        document.getElementById('review-list').innerHTML =
+            '<div class="empty-state">Could not load portfolio review. Please try again.</div>';
+    });
+}
+let allClients = [];
+
+function renderClientList(clients) {
+    const list = document.getElementById('review-list');
+    if (clients.length === 0) {
+        list.innerHTML = '<div class="empty-state">No clients match your search.</div>';
+        return;
+    }
+    list.innerHTML = clients.map(c => `
+        <a href="/portfolio-review/${c.client_id}" class="review-row">
+            <div class="review-name">${c.client_name}</div>
+            <div class="review-status">
+                ${c.max_drift_pct !== null ? `<span class="drift-amount">${c.max_drift_pct}% drift</span>` : ''}
+                <span class="status-badge ${c.status}">${statusLabels[c.status] || c.status}</span>
+            </div>
+        </a>`).join('');
+}
+
+document.getElementById('client-search').addEventListener('input', function(e) {
+    const query = e.target.value.toLowerCase();
+    const filtered = allClients.filter(c => c.client_name.toLowerCase().includes(query));
+    renderClientList(filtered);
+});
+</script>
+{% endblock %}

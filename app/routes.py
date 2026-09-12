@@ -1,3 +1,4 @@
+from portfolio_snapshots_db import save_snapshot, get_client_snapshots
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
 from auth import login_advisor, register_advisor
 from logic import calculate_allocation, portfolio_score, get_advisor_flags, generate_suitability_note
@@ -28,6 +29,150 @@ SEC_HEADERS = {
     "Accept-Encoding": "gzip, deflate"
 }
 
+def _calculate_portfolio_drift(allocation, instruments, amount, original_prices):
+    import yfinance as yf
+    from concurrent.futures import ThreadPoolExecutor
+
+    cat_labels = {
+        "equity_etfs":   "Equity ETFs",
+        "growth_stocks": "Growth Stocks",
+        "bond_etfs":     "Bond ETFs",
+        "mutual_funds":  "Mutual Funds",
+        "cds":           "CDs"
+    }
+
+    def fetch_price(ticker):
+        try:
+            if ticker.startswith("CD-") or ticker == "TBILL":
+                return ticker, None
+            info  = yf.Ticker(ticker).info
+            price = info.get("regularMarketPrice") or \
+                    info.get("currentPrice") or \
+                    info.get("navPrice", 0)
+            return ticker, float(price) if price else None
+        except Exception:
+            return ticker, None
+
+    all_tickers = []
+    for cat, items in instruments.items():
+        for inst in items:
+            ticker = inst.get("ticker", "")
+            if ticker and ticker not in all_tickers:
+                all_tickers.append(ticker)
+
+    current_prices = {}
+    if all_tickers:
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            results = executor.map(fetch_price, all_tickers)
+            for ticker, price in results:
+                if price:
+                    current_prices[ticker] = price
+
+    results = []
+
+    for cat, target_pct in allocation.items():
+        if not target_pct or target_pct == 0:
+            continue
+
+        target_amt   = round((target_pct / 100) * amount)
+        cat_instrs   = instruments.get(cat, [])
+        inst_details = []
+        current_value = 0
+        has_real_data = False
+
+        for inst in cat_instrs:
+            ticker       = inst.get("ticker", "")
+            inst_pct     = inst.get("allocation_pct", 0)
+            original_amt = round((inst_pct / 100) * amount)
+
+            if ticker.startswith("CD-") or ticker == "TBILL":
+                current_value += original_amt
+                continue
+
+            orig_price    = original_prices.get(ticker)
+            current_price = current_prices.get(ticker)
+
+            if orig_price and current_price and orig_price > 0:
+                shares         = original_amt / orig_price
+                current_value += round(shares * current_price)
+                has_real_data  = True
+                pct_change     = round(((current_price - orig_price) / orig_price) * 100, 2)
+                inst_details.append({
+                    "ticker":        ticker,
+                    "name":          inst.get("name", ""),
+                    "orig_price":    round(orig_price, 2),
+                    "current_price": round(current_price, 2),
+                    "pct_change":    pct_change,
+                    "direction":     "up" if pct_change > 0 else "down" if pct_change < 0 else "flat"
+                })
+            else:
+                current_value += original_amt
+
+        current_pct = round((current_value / amount) * 100, 1) if amount > 0 else target_pct
+        drift_pct   = round(current_pct - target_pct, 1)
+        drift_amt   = round(current_value - target_amt)
+
+        if drift_pct > 5:
+            action      = f"Consider trimming ${abs(drift_amt):,}"
+            action_type = "sell"
+        elif drift_pct < -5:
+            action      = f"Consider adding ${abs(drift_amt):,}"
+            action_type = "buy"
+        else:
+            action      = "On target — hold"
+            action_type = "hold"
+
+        results.append({
+            "category":      cat_labels.get(cat, cat),
+            "target_pct":    target_pct,
+            "current_pct":   current_pct,
+            "current_value": current_value,
+            "drift_pct":     drift_pct,
+            "drift_amt":     drift_amt,
+            "action":        action,
+            "action_type":   action_type,
+            "has_real_data": has_real_data,
+            "instruments":   inst_details
+        })
+
+    return results
+def _build_action_plan(drift_results):
+    """
+    Turns drift results into two actionable lists:
+    - rebalance_actions: categories that exceed the 2% threshold,
+      naming the largest holding in that category as the likely trade
+    - tax_loss_opportunities: individual instruments currently at a
+      loss since purchase
+    """
+    rebalance_actions = []
+    tax_loss_opportunities = []
+
+    for cat in drift_results:
+        if cat["action_type"] in ("buy", "sell"):
+            largest_holding = None
+            if cat["instruments"]:
+                largest_holding = max(cat["instruments"], key=lambda i: abs(i["pct_change"]))
+
+            rebalance_actions.append({
+                "category":    cat["category"],
+                "action_type": cat["action_type"],
+                "amount":      abs(cat["drift_amt"]),
+                "detail":      cat["action"],
+                "largest_holding": largest_holding["ticker"] if largest_holding else None
+            })
+
+        for inst in cat["instruments"]:
+            if inst["pct_change"] < 0:
+                tax_loss_opportunities.append({
+                    "ticker":     inst["ticker"],
+                    "name":       inst["name"],
+                    "category":   cat["category"],
+                    "pct_change": inst["pct_change"]
+                })
+
+    tax_loss_opportunities.sort(key=lambda x: x["pct_change"])
+
+    return rebalance_actions, tax_loss_opportunities
 
 def _fetch_feed(url, headers=None, limit=8):
     resp = req.get(url, headers=headers, timeout=8)
@@ -1196,116 +1341,220 @@ def portfolio_drift():
         amount          = data.get("amount", 0)
         original_prices = data.get("original_prices", {})
 
-        import yfinance as yf
-        from concurrent.futures import ThreadPoolExecutor
-
-        cat_labels = {
-            "equity_etfs":   "Equity ETFs",
-            "growth_stocks": "Growth Stocks",
-            "bond_etfs":     "Bond ETFs",
-            "mutual_funds":  "Mutual Funds",
-            "cds":           "CDs"
-        }
-
-        def fetch_price(ticker):
-            try:
-                if ticker.startswith("CD-") or ticker == "TBILL":
-                    return ticker, None
-                info  = yf.Ticker(ticker).info
-                price = info.get("regularMarketPrice") or \
-                        info.get("currentPrice") or \
-                        info.get("navPrice", 0)
-                return ticker, float(price) if price else None
-            except Exception:
-                return ticker, None
-
-        all_tickers = []
-        for cat, items in instruments.items():
-            for inst in items:
-                ticker = inst.get("ticker", "")
-                if ticker and ticker not in all_tickers:
-                    all_tickers.append(ticker)
-
-        current_prices = {}
-        if all_tickers:
-            with ThreadPoolExecutor(max_workers=10) as executor:
-                results = executor.map(fetch_price, all_tickers)
-                for ticker, price in results:
-                    if price:
-                        current_prices[ticker] = price
-
-        results = []
-
-        for cat, target_pct in allocation.items():
-            if not target_pct or target_pct == 0:
-                continue
-
-            target_amt    = round((target_pct / 100) * amount)
-            cat_instrs    = instruments.get(cat, [])
-            inst_details  = []
-            current_value = 0
-            has_real_data = False
-
-            for inst in cat_instrs:
-                ticker       = inst.get("ticker", "")
-                inst_pct     = inst.get("allocation_pct", 0)
-                original_amt = round((inst_pct / 100) * amount)
-
-                if ticker.startswith("CD-") or ticker == "TBILL":
-                    current_value += original_amt
-                    continue
-
-                orig_price    = original_prices.get(ticker)
-                current_price = current_prices.get(ticker)
-
-                if orig_price and current_price and orig_price > 0:
-                    shares         = original_amt / orig_price
-                    current_value += round(shares * current_price)
-                    has_real_data  = True
-                    pct_change     = round(((current_price - orig_price) / orig_price) * 100, 2)
-                    inst_details.append({
-                        "ticker":        ticker,
-                        "name":          inst.get("name", ""),
-                        "orig_price":    round(orig_price, 2),
-                        "current_price": round(current_price, 2),
-                        "pct_change":    pct_change,
-                        "direction":     "up" if pct_change > 0 else "down" if pct_change < 0 else "flat"
-                    })
-                else:
-                    current_value += original_amt
-
-            current_pct = round((current_value / amount) * 100, 1) if amount > 0 else target_pct
-            drift_pct   = round(current_pct - target_pct, 1)
-            drift_amt   = round(current_value - target_amt)
-
-            if drift_pct > 2:
-                action      = f"Consider trimming ${abs(drift_amt):,}"
-                action_type = "sell"
-            elif drift_pct < -2:
-                action      = f"Consider adding ${abs(drift_amt):,}"
-                action_type = "buy"
-            else:
-                action      = "On target — hold"
-                action_type = "hold"
-
-            results.append({
-                "category":      cat_labels.get(cat, cat),
-                "target_pct":    target_pct,
-                "current_pct":   current_pct,
-                "drift_pct":     drift_pct,
-                "drift_amt":     drift_amt,
-                "action":        action,
-                "action_type":   action_type,
-                "has_real_data": has_real_data,
-                "instruments":   inst_details
-            })
-
+        results = _calculate_portfolio_drift(allocation, instruments, amount, original_prices)
         return json.dumps({"success": True, "results": results})
 
     except Exception as e:
         print(f"Portfolio drift error: {str(e)}")
         return json.dumps({"success": False, "error": str(e)})
-                
+
+DRIFT_CACHE_TTL_SECONDS = 3600  # 1 hour
+
+_drift_cache = {}
+_drift_cache_lock = threading.Lock()
+
+
+def _get_client_drift_summary(advisor_id, client_id):
+    try:
+        recs = get_client_recommendations(advisor_id, client_id)
+        if not recs:
+            return {"status": "no_data", "max_drift_pct": None, "total_value": None}
+
+        latest = recs[0]
+        ai_data = latest.get("ai_data", {})
+        selected_label = latest.get("selected_option", "")
+        selected_id = selected_label[0] if selected_label else None
+
+        if not ai_data or not selected_id:
+            return {"status": "no_data", "max_drift_pct": None, "total_value": None}
+
+        options = ai_data.get("options", [])
+        selected = next((o for o in options if o.get("id") == selected_id), None)
+        if not selected:
+            return {"status": "no_data", "max_drift_pct": None, "total_value": None}
+
+        instruments = selected.get("instruments", {})
+        allocation  = latest.get("allocation", {})
+        amount      = latest.get("amount", 0)
+        original_prices = latest.get("instrument_prices", {})
+
+        if not instruments or not original_prices:
+            return {"status": "no_data", "max_drift_pct": None, "total_value": None}
+
+        results = _calculate_portfolio_drift(allocation, instruments, amount, original_prices)
+        if not results:
+            return {"status": "no_data", "max_drift_pct": None, "total_value": None}
+
+        max_drift = max(abs(r["drift_pct"]) for r in results)
+        total_value = sum(r["current_value"] for r in results)
+        status = "needs_rebalancing" if max_drift > 2 else "on_target"
+
+        save_snapshot(advisor_id, client_id, total_value)
+
+        return {"status": status, "max_drift_pct": max_drift, "total_value": total_value}
+
+    except Exception as e:
+        print(f"Drift summary error for client {client_id}: {str(e)}")
+        return {"status": "error", "max_drift_pct": None, "total_value": None}
+
+
+def _get_cached_drift_summary(advisor_id, client_id):
+    now = time.time()
+    cache_key = f"{advisor_id}:{client_id}"
+
+    with _drift_cache_lock:
+        cached = _drift_cache.get(cache_key)
+
+    if cached and (now - cached["timestamp"]) < DRIFT_CACHE_TTL_SECONDS:
+        return cached["summary"], cached["timestamp"]
+
+    summary = _get_client_drift_summary(advisor_id, client_id)
+    with _drift_cache_lock:
+        _drift_cache[cache_key] = {"summary": summary, "timestamp": now}
+    return summary, now
+
+def refresh_all_drift_caches():
+    """
+    Background job: refreshes drift cache for every client of every
+    advisor, so pages always read from cache instead of computing live.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+    try:
+        from clients_db import get_supabase
+        advisors = get_supabase().table("advisors").select("id").execute()
+        advisor_ids = [a["id"] for a in advisors.data] if advisors.data else []
+
+        def refresh_one(pair):
+            advisor_id, client_id = pair
+            now = time.time()
+            summary = _get_client_drift_summary(advisor_id, client_id)
+            cache_key = f"{advisor_id}:{client_id}"
+            with _drift_cache_lock:
+                _drift_cache[cache_key] = {"summary": summary, "timestamp": now}
+
+        all_pairs = []
+        for advisor_id in advisor_ids:
+            clients = get_all_clients(advisor_id)
+            for client in clients:
+                all_pairs.append((advisor_id, client.get("id")))
+
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            executor.map(refresh_one, all_pairs)
+
+        print(f"[BACKGROUND] Refreshed drift cache for {len(all_pairs)} clients")
+
+    except Exception as e:
+        print(f"[BACKGROUND] Drift refresh error: {str(e)}")
+
+    
+# ── Portfolio Review (list) ────────────────────────────────
+@main.route("/portfolio-review")
+def portfolio_review():
+    if not session.get("logged_in"):
+        flash("Please log in to continue.", "info")
+        return redirect(url_for("main.login"))
+
+    advisor_id  = session["advisor"]["user_id"]
+    all_clients = get_all_clients(advisor_id)
+
+    return render_template("portal/portfolio_review.html",
+        advisor=session.get("advisor"),
+        clients=all_clients)
+
+
+@main.route("/portfolio-review-data", methods=["POST"])
+def portfolio_review_data():
+    if not session.get("logged_in"):
+        return json.dumps({"success": False})
+
+    try:
+        advisor_id  = session["advisor"]["user_id"]
+        all_clients = get_all_clients(advisor_id)
+
+        results = []
+        for client in all_clients:
+            client_id = client.get("id")
+            summary, cached_at = _get_cached_drift_summary(advisor_id, client_id)
+            results.append({
+                "client_id":     client_id,
+                "client_name":   client.get("client_name", "Unknown"),
+                "status":        summary["status"],
+                "max_drift_pct": summary["max_drift_pct"],
+                "cached_at":     cached_at
+            })
+
+        order = {"needs_rebalancing": 0, "error": 1, "no_data": 2, "on_target": 3}
+        results.sort(key=lambda r: (order.get(r["status"], 9), -(r["max_drift_pct"] or 0)))
+
+        return json.dumps({"success": True, "clients": results})
+
+    except Exception as e:
+        print(f"Portfolio review error: {str(e)}")
+        return json.dumps({"success": False})
+
+
+# ── Portfolio Review (detail) ──────────────────────────────
+@main.route("/portfolio-review/<client_id>")
+def portfolio_review_detail(client_id):
+    if not session.get("logged_in"):
+        flash("Please log in to continue.", "info")
+        return redirect(url_for("main.login"))
+
+    advisor_id = session["advisor"]["user_id"]
+    client     = get_client(client_id, advisor_id)
+
+    if not client:
+        flash("Client not found.", "error")
+        return redirect(url_for("main.portfolio_review"))
+
+    return render_template("portal/portfolio_review_detail.html",
+        advisor=session.get("advisor"),
+        client=client)
+
+
+@main.route("/portfolio-review-detail-data/<client_id>", methods=["POST"])
+def portfolio_review_detail_data(client_id):
+    if not session.get("logged_in"):
+        return json.dumps({"success": False})
+
+    try:
+        advisor_id = session["advisor"]["user_id"]
+        recs = get_client_recommendations(advisor_id, client_id)
+
+        if not recs:
+            return json.dumps({"success": False, "message": "No saved recommendation for this client yet."})
+
+        latest = recs[0]
+        ai_data = latest.get("ai_data", {})
+        selected_label = latest.get("selected_option", "")
+        selected_id = selected_label[0] if selected_label else None
+        options = ai_data.get("options", [])
+        selected = next((o for o in options if o.get("id") == selected_id), None)
+
+        if not selected:
+            return json.dumps({"success": False, "message": "No saved recommendation for this client yet."})
+
+        instruments = selected.get("instruments", {})
+        allocation  = latest.get("allocation", {})
+        amount      = latest.get("amount", 0)
+        original_prices = latest.get("instrument_prices", {})
+
+        drift_results = _calculate_portfolio_drift(allocation, instruments, amount, original_prices)
+        rebalance_actions, tax_loss_opportunities = _build_action_plan(drift_results)
+        snapshots = get_client_snapshots(advisor_id, client_id)
+
+        return json.dumps({
+            "success": True,
+            "amount": amount,
+            "drift": drift_results,
+            "snapshots": snapshots,
+            "rebalance_actions": rebalance_actions,
+            "tax_loss_opportunities": tax_loss_opportunities
+        })
+
+    except Exception as e:
+        print(f"Portfolio review detail error: {str(e)}")
+        return json.dumps({"success": False})                
 # ── Meeting Prep ──────────────────────────────────────────
 @main.route("/clients/<client_id>/meeting-prep")
 def meeting_prep(client_id):

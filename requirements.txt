@@ -10,3 +10,4 @@ plotly
 pandas
 gunicorn
 feedparser
+apscheduler
