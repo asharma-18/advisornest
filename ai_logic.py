@@ -70,6 +70,47 @@ OPTION_DEFINITIONS = {
     }
 }
 
+def _validate_and_fix_allocations(option, amount):
+    """
+    Ensures each category's instrument allocation_pct values sum
+    exactly to that category's stated allocation. If they don't,
+    scales the instruments proportionally to close the gap and
+    recalculates dollar_amount accordingly. Logs when a fix happens.
+    """
+    allocation = option.get("allocation", {})
+    instruments = option.get("instruments", {})
+
+    for category, target_pct in allocation.items():
+        cat_instruments = instruments.get(category, [])
+
+        if not target_pct or target_pct == 0:
+            continue
+
+        current_sum = sum(inst.get("allocation_pct", 0) for inst in cat_instruments)
+
+        if current_sum == target_pct:
+            continue
+
+        if not cat_instruments:
+            print(f"[AI VALIDATION] Option {option.get('id')} — {category} has {target_pct}% target but no instruments to scale. Skipping.")
+            continue
+
+        print(f"[AI VALIDATION] Option {option.get('id')} — {category} instruments summed to {current_sum}% instead of {target_pct}%. Auto-correcting.")
+
+        scale_factor = target_pct / current_sum if current_sum > 0 else 0
+
+        running_total = 0
+        for i, inst in enumerate(cat_instruments):
+            if i == len(cat_instruments) - 1:
+                new_pct = target_pct - running_total
+            else:
+                new_pct = round(inst.get("allocation_pct", 0) * scale_factor)
+                running_total += new_pct
+
+            inst["allocation_pct"] = new_pct
+            inst["dollar_amount"] = round((new_pct / 100) * amount)
+
+    return option
 
 def generate_single_option(
     option_id, client_name, age, life_stage,
@@ -205,6 +246,7 @@ Return ONLY valid JSON. No markdown. No explanation."""
             content = content[:-3]
 
         option = json.loads(content.strip())
+        option = _validate_and_fix_allocations(option, amount)
         return {"success": True, "option": option}
 
     except json.JSONDecodeError as e:
