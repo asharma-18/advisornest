@@ -5,18 +5,24 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
+import threading
+import time
+
+_enriched_data_cache = {"data": {}, "timestamp": 0}
+_enriched_data_lock = threading.Lock()
+ENRICHED_DATA_TTL_SECONDS = 7200  # 2 hours
 
 # ── Curated instrument lists by risk ─────────────────────
 STOCKS_LONG_TERM = {
-    "low":    ["VTI", "VOO", "SCHD", "VYM", "BRK-B"],
-    "medium": ["VOO", "VTI", "MSFT", "AAPL", "JNJ"],
-    "high":   ["MSFT", "AAPL", "NVDA", "GOOGL", "AMZN"]
+    "low":    ["VTI", "VOO", "SCHD", "VYM", "BRK-B", "V", "MA", "LIN", "ABT"],
+    "medium": ["VOO", "VTI", "MSFT", "AAPL", "JNJ", "ACN", "TMO", "TXN"],
+    "high":   ["MSFT", "AAPL", "NVDA", "GOOGL", "AMZN", "CRM", "ADBE", "ISRG"]
 }
 
 STOCKS_SHORT_TERM = {
     "low":    ["VIG", "NOBL", "SDY"],
     "medium": ["QQQ", "SPY", "META", "TSLA"],
-    "high":   ["NVDA", "META", "TSLA", "AMD", "ARKK"]
+    "high":   ["NVDA", "META", "TSLA", "AMD", "ARKK", "PANW", "SNPS", "LRCX", "NOW", "NFLX", "INTU"]
 }
 
 BONDS = {
@@ -26,9 +32,9 @@ BONDS = {
 }
 
 MUTUAL_FUNDS = {
-    "low":    ["VFIAX", "VBTLX", "VWELX"],
-    "medium": ["VFIAX", "FXAIX", "VWELX"],
-    "high":   ["FXAIX", "FOCPX", "VIMAX"]
+    "low":    ["VFIAX", "VBTLX", "VWELX", "SWPPX"],
+    "medium": ["VFIAX", "FXAIX", "VWELX", "SWPPX", "PRGFX"],
+    "high":   ["FXAIX", "FOCPX", "VIMAX", "AGTHX", "FCNTX", "FBGRX"]
 }
 
 
@@ -181,3 +187,56 @@ def fetch_instrument_prices(instruments):
             prices[ticker] = price
 
     return prices
+
+def get_enriched_instrument_data(tickers):
+    """
+    Fetches current fundamental data (price, P/E, dividend yield) for
+    a list of tickers, formatted for inclusion in the AI prompt so
+    recommendations are grounded in real numbers instead of the
+    model's training-time memory.
+    Returns dict: {ticker: {"price": ..., "pe_ratio": ..., "dividend_yield": ...}}
+    """
+    def fetch_one(ticker):
+        try:
+            if ticker.startswith("CD-") or ticker == "TBILL":
+                return ticker, None
+            info = yf.Ticker(ticker).info
+            price = info.get("regularMarketPrice") or info.get("currentPrice", 0)
+            pe = info.get("trailingPE")
+            div_yield = info.get("dividendYield")
+            return ticker, {
+                "price": round(price, 2) if price else None,
+                "pe_ratio": round(pe, 1) if pe else None,
+                "dividend_yield": round(div_yield * 100, 2) if div_yield and div_yield < 1 else (round(div_yield, 2) if div_yield else None)
+            }
+        except Exception:
+            return ticker, None
+
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        results = dict(executor.map(fetch_one, tickers))
+
+    return {k: v for k, v in results.items() if v is not None}
+
+def get_cached_enriched_data(tickers):
+    """
+    Returns enriched instrument data from cache if fresh, otherwise
+    fetches once and caches for all tickers together, shared across
+    every recommendation generated within the TTL window. The lock is
+    held across the fetch itself so concurrent callers (e.g. all 4
+    options generating in parallel) don't each redundantly re-fetch
+    on a cold cache — only the first one fetches, others wait and
+    reuse its result.
+    """
+    now = time.time()
+
+    with _enriched_data_lock:
+        cached = _enriched_data_cache
+        if cached["data"] and (now - cached["timestamp"]) < ENRICHED_DATA_TTL_SECONDS:
+            missing = [t for t in tickers if t not in cached["data"] and not t.startswith("CD-") and t != "TBILL"]
+            if not missing:
+                return cached["data"]
+
+        fresh_data = get_enriched_instrument_data(tickers)
+        _enriched_data_cache["data"] = fresh_data
+        _enriched_data_cache["timestamp"] = now
+        return fresh_data

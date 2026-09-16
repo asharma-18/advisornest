@@ -1,3 +1,4 @@
+import threading
 from flask import Flask
 from config import Config
 import os
@@ -23,6 +24,6 @@ def create_app():
     scheduler.add_job(refresh_all_drift_caches, 'interval', minutes=15)
     scheduler.start()
 
-    refresh_all_drift_caches()
+    threading.Thread(target=refresh_all_drift_caches, daemon=True).start()
 
     return app

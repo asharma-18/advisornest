@@ -70,6 +70,40 @@ OPTION_DEFINITIONS = {
     }
 }
 
+# ── Risk-tiered instrument pools ──────────────────────────
+# Each option (A-D) draws from a tier appropriate to how conservative
+# or aggressive it is. This keeps the enrichment data fetch small and
+# fast (10-20 tickers instead of ~75), and ensures every ticker the
+# AI is allowed to pick already has real current data behind it.
+OPTION_TIER = {"A": "low", "B": "low", "C": "medium", "D": "high"}
+
+EQUITY_ETF_TIERS = {
+    "low":    ["VOO", "VTI", "SCHD", "VYM", "DGRO", "NOBL", "DVY"],
+    "medium": ["VOO", "VTI", "ITOT", "SCHB", "IVV", "VUG", "SCHG", "VXUS", "VEA", "QQQ", "EFA"],
+    "high":   ["VWO", "XLK", "XLF", "XLV", "XLE"]
+}
+
+GROWTH_STOCK_TIERS = {
+    "low":    ["JNJ", "PG", "KO"],
+    "medium": ["MSFT", "AAPL", "JNJ", "UNH", "PG", "KO", "JPM", "HD", "V", "MA", "LIN", "ABT"],
+    "high":   ["NVDA", "GOOGL", "AMZN", "META", "CRM", "ADBE", "NFLX", "NOW", "INTU", "ISRG", "AMD", "PANW", "SNPS", "LRCX"]
+}
+
+BOND_ETF_TIERS = {
+    "low":    ["BND", "AGG", "MUB", "TIP", "SHY", "IEF"],
+    "medium": ["BND", "AGG", "BNDX", "LQD", "IEF"],
+    "high":   ["HYG", "TLT"]
+}
+
+MUTUAL_FUND_TIERS = {
+    "low":    ["VBTLX"],
+    "medium": ["VFIAX", "FXAIX", "VWELX", "SWPPX"],
+    "high":   ["FOCPX", "VIMAX", "AGTHX", "FCNTX", "FBGRX", "PRGFX"]
+}
+
+CD_LIST = ["CD-3M", "CD-6M", "CD-1Y", "CD-2Y", "TBILL"]
+
+
 def _validate_and_fix_allocations(option, amount):
     """
     Ensures each category's instrument allocation_pct values sum
@@ -112,10 +146,13 @@ def _validate_and_fix_allocations(option, amount):
 
     return option
 
+
 def generate_single_option(
     option_id, client_name, age, life_stage,
     risk, horizon, amount, market_data
 ):
+    from market_data import get_cached_enriched_data
+
     rates = market_data.get("rates", {})
     treasury_10y = rates.get("10_year_treasury", "N/A")
     treasury_1y  = rates.get("1_year_treasury", "N/A")
@@ -123,6 +160,29 @@ def generate_single_option(
 
     opt = OPTION_DEFINITIONS[option_id]
     ranges = opt["ranges"]
+
+    # ── Risk-scoped instrument universe for this option ──────
+    tier = OPTION_TIER.get(option_id, "medium")
+    equity_tickers = EQUITY_ETF_TIERS.get(tier, EQUITY_ETF_TIERS["medium"])
+    growth_tickers = GROWTH_STOCK_TIERS.get(tier, GROWTH_STOCK_TIERS["medium"])
+    bond_tickers   = BOND_ETF_TIERS.get(tier, BOND_ETF_TIERS["medium"])
+    fund_tickers   = MUTUAL_FUND_TIERS.get(tier, MUTUAL_FUND_TIERS["medium"])
+
+    all_tickers_for_option = equity_tickers + growth_tickers + bond_tickers + fund_tickers
+    enriched_data = get_cached_enriched_data(all_tickers_for_option)
+
+    enriched_text_lines = []
+    for ticker in all_tickers_for_option:
+        data = enriched_data.get(ticker)
+        if not data:
+            continue
+        parts = [f"{ticker}: price ${data['price']}"]
+        if data.get("pe_ratio"):
+            parts.append(f"P/E {data['pe_ratio']}")
+        if data.get("dividend_yield"):
+            parts.append(f"dividend yield {data['dividend_yield']}%")
+        enriched_text_lines.append(" — ".join(parts))
+    enriched_text = "\n".join(enriched_text_lines)
 
     prompt = f"""You are a senior portfolio analyst providing DECISION SUPPORT to licensed financial advisors.
 
@@ -154,18 +214,21 @@ STRICT ALLOCATION RANGES FOR THIS OPTION (must stay within these):
 
 APPROVED INSTRUMENTS ONLY:
 
-EQUITY ETFs: VOO, VTI, ITOT, SCHB, IVV, SCHD, VYM, DGRO, NOBL, DVY, QQQ, VUG, SCHG, IWF, VXUS, VEA, VWO, EFA, XLK, XLF, XLV, XLE, XLU, XLP, XLI, AOM, AOA, AOK
+EQUITY ETFs: {", ".join(equity_tickers)}
 hold_period: "Core — Long Term Hold" or "Tactical — 12 to 18 Months"
 
-GROWTH STOCKS: MSFT, AAPL, GOOGL, AMZN, NVDA, META, JNJ, UNH, PFE, ABBV, JPM, BAC, WFC, GS, HD, MCD, COST, CAT, HON, UNP, BRK-B, PG, KO
+GROWTH STOCKS: {", ".join(growth_tickers)}
 hold_period: "Strategic — 5 to 10 Years", "Strategic — 10+ Years", "Tactical — 6 to 12 Months", "Tactical — 12 to 18 Months"
 
-BOND ETFs: BND, AGG, BNDX, TLT, IEF, SHY, LQD, HYG, TIP, MUB
+BOND ETFs: {", ".join(bond_tickers)}
 hold_period: "Income — Long Term Hold" or "Duration Play — 12 to 24 Months"
 
-MUTUAL FUNDS: VFIAX, VBTLX, VWELX, FXAIX, FZROX, PIMIX, DODGX
+MUTUAL FUNDS: {", ".join(fund_tickers)}
 
-CDs: CD-3M, CD-6M, CD-1Y, CD-2Y, TBILL
+CDs: {", ".join(CD_LIST)}
+
+CURRENT DATA FOR APPROVED INSTRUMENTS (use this real data to inform your selections):
+{enriched_text}
 
 RULES:
 - Only use instruments from the approved lists above
