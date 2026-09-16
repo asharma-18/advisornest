@@ -56,7 +56,32 @@ def save_client(advisor_id, client_data):
             "success": False,
             "message": f"Failed: {repr(e)}"
         }
+def update_client(client_id, advisor_id, client_data):
+    """
+    Updates an existing client's allocation, score, flags, and
+    suitability note. Used when an advisor edits a saved recommendation.
+    advisor_id is checked so advisors can only update their own clients.
+    """
+    try:
+        result = get_supabase().table("clients")\
+            .update({
+                "allocation":       client_data["allocation"],
+                "score":            client_data["score"],
+                "flags":            client_data["flags"],
+                "suitability_note": client_data["suitability_note"],
+            })\
+            .eq("id", client_id)\
+            .eq("advisor_id", advisor_id)\
+            .execute()
 
+        if result.data:
+            return {"success": True, "message": "Client updated successfully."}
+        return {"success": False, "message": "Could not update client."}
+
+    except Exception as e:
+        print(f"Update client error: {str(e)}")
+        return {"success": False, "message": str(e)}
+    
 def get_all_clients(advisor_id):
     try:
         print(f"Fetching clients for advisor_id: {advisor_id}")

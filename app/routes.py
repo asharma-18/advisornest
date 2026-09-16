@@ -2,8 +2,8 @@ from portfolio_snapshots_db import save_snapshot, get_client_snapshots
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
 from auth import login_advisor, register_advisor
 from logic import calculate_allocation, portfolio_score, get_advisor_flags, generate_suitability_note
-from market_data import get_all_market_data
-from clients_db import save_client, get_all_clients, get_client, delete_client, get_client_count
+from market_data import get_all_market_data, fetch_instrument_prices
+from clients_db import save_client, get_all_clients, get_client, delete_client, get_client_count, update_client
 from notes_db import get_all_notes, get_client_notes, add_note, delete_note, get_note_count, update_note
 from recommendations_db import (
     save_recommendation, get_all_recommendations,
@@ -782,6 +782,112 @@ def clients():
         clients=all_clients,
         client_count=client_count)
 
+# ── Edit Client (load existing recommendation for editing) ─
+@main.route("/edit-client/<client_id>")
+def edit_client(client_id):
+    if not session.get("logged_in"):
+        flash("Please log in to continue.", "info")
+        return redirect(url_for("main.login"))
+
+    advisor_id = session["advisor"]["user_id"]
+    client     = get_client(client_id, advisor_id)
+
+    if not client:
+        flash("Client not found.", "error")
+        return redirect(url_for("main.clients"))
+
+    recs = get_client_recommendations(advisor_id, client_id)
+    latest_rec = recs[0] if recs else None
+
+    if not latest_rec or not latest_rec.get("ai_data"):
+        flash("No editable recommendation data found for this client.", "error")
+        return redirect(url_for("main.view_client", client_id=client_id))
+
+    ai_data = latest_rec.get("ai_data", {})
+    selected_label = latest_rec.get("selected_option", "")
+    selected_id = selected_label[0] if selected_label else None
+    options = ai_data.get("options", [])
+    selected_option = next((o for o in options if o.get("id") == selected_id), None)
+
+    if not selected_option:
+        flash("Could not find the selected option for this recommendation.", "error")
+        return redirect(url_for("main.view_client", client_id=client_id))
+
+    return render_template("portal/edit_client.html",
+        advisor=session.get("advisor"),
+        client=client,
+        option=selected_option,
+        market_data=latest_rec.get("ai_data", {}))
+
+# ── Save Edited Client ──────────────────────────────────────
+@main.route("/save-edited-client/<client_id>", methods=["POST"])
+def save_edited_client(client_id):
+    if not session.get("logged_in"):
+        return redirect(url_for("main.login"))
+
+    advisor_id = session["advisor"]["user_id"]
+    client = get_client(client_id, advisor_id)
+
+    if not client:
+        flash("Client not found.", "error")
+        return redirect(url_for("main.clients"))
+
+    try:
+        allocation = json.loads(request.form.get("allocation", "{}"))
+        instruments = json.loads(request.form.get("instruments", "{}"))
+        suitability_note = request.form.get("suitability_note", "")
+
+        score = portfolio_score(client["risk"], client["horizon"], client["age"])
+        flags = get_advisor_flags(client["risk"], client["horizon"], client["age"])
+
+        result = update_client(client_id, advisor_id, {
+            "allocation": allocation,
+            "score": score,
+            "flags": flags,
+            "suitability_note": suitability_note,
+        })
+
+        if result["success"]:
+            instrument_prices = fetch_instrument_prices(instruments)
+
+            save_recommendation(advisor_id, client_id, {
+                "client_name":       client["client_name"],
+                "age":               client["age"],
+                "life_stage":        client["life_stage"],
+                "amount":            client["amount"],
+                "risk":              client["risk"],
+                "horizon":           client["horizon"],
+                "selected_option":   request.form.get("selected_option", ""),
+                "ai_data":           {
+                    "options": [{
+                        "id": request.form.get("option_id", ""),
+                        "name": request.form.get("option_name", ""),
+                        "tagline": "",
+                        "recommended": False,
+                        "allocation": allocation,
+                        "instruments": instruments,
+                        "reasoning": "Edited by advisor after initial recommendation.",
+                        "key_considerations": [],
+                        "flags": []
+                    }],
+                    "market_context": "",
+                    "advisor_note": ""
+                },
+                "allocation":        allocation,
+                "suitability_note":  suitability_note,
+                "score":             score,
+                "instrument_prices": instrument_prices,
+            })
+
+            flash("Recommendation updated successfully.", "success")
+        else:
+            flash(result["message"], "error")
+
+    except Exception as e:
+        print(f"Save edited client error: {str(e)}")
+        flash("Could not update recommendation. Please try again.", "error")
+
+    return redirect(url_for("main.view_client", client_id=client_id))
 
 # ── Delete Client ─────────────────────────────────────────
 @main.route("/delete-client/<client_id>", methods=["POST"])
@@ -1438,7 +1544,7 @@ def refresh_all_drift_caches():
             for client in clients:
                 all_pairs.append((advisor_id, client.get("id")))
 
-        with ThreadPoolExecutor(max_workers=10) as executor:
+        with ThreadPoolExecutor(max_workers=5) as executor:
             executor.map(refresh_one, all_pairs)
 
         print(f"[BACKGROUND] Refreshed drift cache for {len(all_pairs)} clients")

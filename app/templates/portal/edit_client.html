@@ -1,0 +1,433 @@
+{% extends "base.html" %}
+
+{% block title %}Edit {{ client.client_name }} — AdvisorNest{% endblock %}
+{% block page_title %}Edit Recommendation{% endblock %}
+{% block page_subtitle %}{{ client.client_name }} — adjust allocation and instruments{% endblock %}
+
+{% block extra_css %}
+<style>
+    .alloc-slider-row {
+        display: grid;
+        grid-template-columns: 140px 1fr 60px;
+        gap: 12px; align-items: center;
+        margin-bottom: 12px;
+    }
+    .alloc-slider-label { font-size: 0.85rem; font-weight: 600; color: var(--text-primary); }
+    .alloc-slider { width: 100%; accent-color: var(--navy); cursor: pointer; }
+    .alloc-slider-val { font-size: 0.9rem; font-weight: 700; color: var(--navy); text-align: right; }
+
+    .alloc-total {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 10px 14px; border-radius: 8px;
+        background: var(--bg-primary); border: 1px solid var(--border);
+        margin-bottom: 16px; font-size: 0.9rem;
+    }
+    .alloc-total-val { font-size: 1.1rem; font-weight: 700; }
+    .alloc-total-val.ok { color: var(--success); }
+    .alloc-total-val.over { color: var(--error); }
+
+    .instr-editor-tabs {
+        display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 16px;
+    }
+    .instr-editor-tab {
+        padding: 8px 12px; font-size: 0.8rem; font-weight: 500;
+        color: var(--text-muted); cursor: pointer; border: none;
+        border-bottom: 2px solid transparent; margin-bottom: -1px;
+        background: none; font-family: var(--font-body); transition: all 0.2s;
+    }
+    .instr-editor-tab.active { color: var(--navy); border-bottom-color: var(--navy); font-weight: 600; }
+    .instr-editor-content { display: none; }
+    .instr-editor-content.active { display: block; }
+
+    .instr-row {
+        display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+        background: var(--bg-primary); border: 1px solid var(--border);
+        border-radius: 8px; margin-bottom: 6px;
+    }
+    .instr-row-ticker { font-size: 0.875rem; font-weight: 700; color: var(--text-primary); min-width: 55px; }
+    .instr-row-name { flex: 1; font-size: 0.8rem; color: var(--text-muted); }
+    .instr-row-pct { font-size: 0.875rem; font-weight: 700; color: var(--navy); min-width: 36px; text-align: right; }
+    .instr-remove-btn {
+        width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--border);
+        background: white; color: var(--error); font-size: 0.9rem; cursor: pointer;
+        display: flex; align-items: center; justify-content: center; flex-shrink: 0; line-height: 1;
+    }
+    .instr-remove-btn:hover { background: var(--error); color: white; }
+
+    .add-instr-row { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+    .ticker-search-wrapper { position: relative; flex: 1; }
+    .add-instr-input {
+        width: 100%; height: 36px; background: white;
+        border: 1.5px solid var(--border); border-radius: 6px; padding: 0 10px;
+        font-size: 0.875rem; font-family: var(--font-body); color: var(--text-primary);
+        outline: none; transition: border-color 0.2s;
+    }
+    .add-instr-input:focus { border-color: var(--navy); }
+    .add-instr-pct {
+        width: 70px; height: 36px; background: white;
+        border: 1.5px solid var(--border); border-radius: 6px; padding: 0 10px;
+        font-size: 0.875rem; font-family: var(--font-body); color: var(--text-primary); outline: none;
+    }
+    .add-instr-btn {
+        height: 36px; padding: 0 14px; background: var(--navy); color: white;
+        border: none; border-radius: 6px; font-size: 0.8rem; font-weight: 600;
+        cursor: pointer; white-space: nowrap;
+    }
+    .add-instr-btn:hover { opacity: 0.9; }
+
+    .ticker-search-dropdown {
+        display: none; position: absolute; top: 100%; left: 0; right: 0;
+        background: white; border: 1.5px solid var(--border); border-top: none;
+        border-radius: 0 0 6px 6px; max-height: 220px; overflow-y: auto;
+        z-index: 50; box-shadow: var(--shadow-md);
+    }
+    .ticker-search-dropdown.open { display: block; }
+    .ticker-search-item { padding: 8px 12px; cursor: pointer; font-size: 0.8rem; border-bottom: 1px solid var(--border-light); }
+    .ticker-search-item:last-child { border-bottom: none; }
+    .ticker-search-item:hover { background: var(--bg-primary); }
+    .ticker-search-item-ticker { font-weight: 700; color: var(--text-primary); }
+    .ticker-search-item-name { color: var(--text-muted); font-size: 0.75rem; }
+
+    .ticker-feedback { font-size: 0.75rem; margin-top: 4px; min-height: 18px; }
+    .ticker-feedback.valid { color: var(--success); }
+    .ticker-feedback.invalid { color: var(--error); }
+
+    .empty-category {
+        text-align: center; padding: 20px; color: var(--text-muted); font-size: 0.825rem;
+        background: var(--bg-primary); border: 1px dashed var(--border); border-radius: 8px;
+    }
+
+    .note-status { font-size: 0.75rem; color: var(--text-muted); margin-top: 8px; }
+</style>
+{% endblock %}
+
+{% block page_content %}
+
+<div class="card" style="margin-bottom:20px">
+    <div class="card-header">
+        <div class="card-title">Category Allocations</div>
+        <div class="card-subtitle">Adjust the target allocation for each category. Total must equal 100%.</div>
+    </div>
+
+    {% set cat_labels = {
+        'equity_etfs': 'Equity ETFs', 'growth_stocks': 'Growth Stocks',
+        'bond_etfs': 'Bond ETFs', 'mutual_funds': 'Mutual Funds', 'cds': 'CDs'
+    } %}
+
+    {% for key, pct in option.allocation.items() %}
+    <div class="alloc-slider-row">
+        <div class="alloc-slider-label">{{ cat_labels.get(key, key) }}</div>
+        <input type="range" class="alloc-slider" id="slider-{{ key }}"
+               min="0" max="100" value="{{ pct }}"
+               oninput="onSliderChange('{{ key }}', this.value)">
+        <div class="alloc-slider-val" id="sliderval-{{ key }}">{{ pct }}%</div>
+    </div>
+    {% endfor %}
+
+    <div class="alloc-total">
+        <span>Total Allocation</span>
+        <span class="alloc-total-val ok" id="alloc-total">100%</span>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Edit Instruments</div>
+        <div class="card-subtitle">Add or remove specific instruments within each category.</div>
+    </div>
+
+    <div class="instr-editor-tabs">
+        {% for key, label in [
+            ('equity_etfs', '📊 Equity ETFs'), ('growth_stocks', '📈 Growth Stocks'),
+            ('bond_etfs', '🏦 Bond ETFs'), ('mutual_funds', '💼 Mutual Funds'), ('cds', '💰 CDs')
+        ] %}
+        <button class="instr-editor-tab {% if loop.first %}active{% endif %}"
+                onclick="showEditorTab('edit-{{ key }}', this)">{{ label }}</button>
+        {% endfor %}
+    </div>
+
+    {% for key, label in [
+        ('equity_etfs', '📊 Equity ETFs'), ('growth_stocks', '📈 Growth Stocks'),
+        ('bond_etfs', '🏦 Bond ETFs'), ('mutual_funds', '💼 Mutual Funds'), ('cds', '💰 CDs')
+    ] %}
+    <div id="edit-{{ key }}" class="instr-editor-content {% if loop.first %}active{% endif %}">
+        <div id="instr-list-{{ key }}">
+            {% set instruments = option.instruments.get(key, []) %}
+            {% if instruments %}
+                {% for inst in instruments %}
+                <div class="instr-row" id="instr-{{ key }}-{{ loop.index0 }}">
+                    <div class="instr-row-ticker">{{ inst.ticker }}</div>
+                    <div class="instr-row-name">{{ inst.name }}</div>
+                    <div class="instr-row-pct">{{ inst.allocation_pct }}%</div>
+                    <button class="instr-remove-btn" data-row="instr-{{ key }}-{{ loop.index0 }}"
+                            data-category="{{ key }}" data-ticker="{{ inst.ticker }}">×</button>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-category" id="empty-{{ key }}">No instruments. Add one below.</div>
+            {% endif %}
+        </div>
+
+        <div class="add-instr-row">
+            <div class="ticker-search-wrapper">
+                <input type="text" class="add-instr-input" id="addticker-{{ key }}"
+                       placeholder="Search ticker or company name..." maxlength="60" autocomplete="off"
+                       oninput="searchTicker(this, '{{ key }}')">
+                <div class="ticker-search-dropdown" id="dropdown-{{ key }}"></div>
+            </div>
+            <input type="number" class="add-instr-pct" id="addpct-{{ key }}" placeholder="%" min="1" max="100">
+            <button class="add-instr-btn" onclick="addInstrument('{{ key }}')">+ Add</button>
+        </div>
+        <div class="ticker-feedback" id="feedback-{{ key }}"></div>
+    </div>
+    {% endfor %}
+</div>
+
+<div style="display:flex;gap:12px;margin-top:20px">
+    <button class="btn btn-primary" id="save-btn" onclick="saveEdit()">💾 Save Changes</button>
+    <a href="{{ url_for('main.view_client', client_id=client.id) }}" class="btn btn-ghost">Cancel</a>
+</div>
+<div class="note-status" id="note-status"></div>
+
+<form method="POST" action="{{ url_for('main.save_edited_client', client_id=client.id) }}"
+      id="save-edit-form" style="display:none">
+    <input type="hidden" name="allocation" id="save-allocation">
+    <input type="hidden" name="instruments" id="save-instruments">
+    <input type="hidden" name="suitability_note" id="save-suitability-note">
+    <input type="hidden" name="selected_option" value="{{ option.id }} - {{ option.name }} (Advisor Edited)">
+    <input type="hidden" name="option_id" value="{{ option.id }}">
+    <input type="hidden" name="option_name" value="{{ option.name }}">
+</form>
+
+<script>
+window.CURRENT_ALLOCATION = {{ option.allocation | tojson }};
+window.CURRENT_INSTRUMENTS = {{ option.instruments | tojson }};
+window.CLIENT_PROFILE = {
+    client_name: {{ client.client_name | tojson }},
+    age: {{ client.age }},
+    life_stage: {{ client.life_stage | tojson }},
+    risk: {{ client.risk | tojson }},
+    horizon: {{ client.horizon }},
+    amount: {{ client.amount }}
+};
+window.OPTION_ID = {{ option.id | tojson }};
+window.OPTION_NAME = {{ option.name | tojson }};
+</script>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const tickerCache = {};
+let searchTimer = null;
+
+function onSliderChange(key, value) {
+    value = parseInt(value);
+    window.CURRENT_ALLOCATION[key] = value;
+    document.getElementById('sliderval-' + key).textContent = value + '%';
+
+    const total = Object.values(window.CURRENT_ALLOCATION).reduce((a, b) => a + b, 0);
+    const totalEl = document.getElementById('alloc-total');
+    totalEl.textContent = total + '%';
+    totalEl.className = 'alloc-total-val ' + (total === 100 ? 'ok' : 'over');
+}
+
+function showEditorTab(tabId, button) {
+    document.querySelectorAll('.instr-editor-content').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('.instr-editor-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+    button.classList.add('active');
+}
+
+function searchTicker(input, category) {
+    const query = input.value.trim();
+    const dropdown = document.getElementById('dropdown-' + category);
+    const feedback = document.getElementById('feedback-' + category);
+    if (feedback) feedback.textContent = '';
+
+    if (!query || query.length < 2) {
+        dropdown.classList.remove('open');
+        dropdown.innerHTML = '';
+        return;
+    }
+
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(function() {
+        fetch('/market-watch-data', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({type: 'search', ticker: query})
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success || !data.matches || data.matches.length === 0) {
+                dropdown.innerHTML = '<div class="ticker-search-item" style="color:var(--text-muted)">No matches found</div>';
+                dropdown.classList.add('open');
+                return;
+            }
+            dropdown.innerHTML = '';
+            data.matches.forEach(m => {
+                const item = document.createElement('div');
+                item.className = 'ticker-search-item';
+                item.dataset.ticker = m.ticker;
+                item.dataset.name = m.name;
+                item.innerHTML = '<span class="ticker-search-item-ticker">' + m.ticker +
+                    '</span> — <span class="ticker-search-item-name">' + m.name + '</span>';
+                item.addEventListener('click', function() {
+                    selectTickerFromSearch(category, this.dataset.ticker, this.dataset.name);
+                });
+                dropdown.appendChild(item);
+            });
+            dropdown.classList.add('open');
+        })
+        .catch(() => {
+            dropdown.innerHTML = '<div class="ticker-search-item" style="color:var(--error)">Search failed</div>';
+            dropdown.classList.add('open');
+        });
+    }, 400);
+}
+
+function selectTickerFromSearch(category, ticker, name) {
+    const tickerInput = document.getElementById('addticker-' + category);
+    const dropdown = document.getElementById('dropdown-' + category);
+    const feedback = document.getElementById('feedback-' + category);
+    tickerInput.value = ticker;
+    dropdown.classList.remove('open');
+    dropdown.innerHTML = '';
+    tickerCache[ticker] = {name: name};
+    feedback.textContent = '✓ ' + name;
+    feedback.className = 'ticker-feedback valid';
+}
+
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.ticker-search-wrapper')) {
+        document.querySelectorAll('.ticker-search-dropdown').forEach(d => d.classList.remove('open'));
+    }
+});
+
+function addInstrument(category) {
+    const tickerInput = document.getElementById('addticker-' + category);
+    const pctInput = document.getElementById('addpct-' + category);
+    const feedback = document.getElementById('feedback-' + category);
+
+    const ticker = tickerInput.value.trim().toUpperCase();
+    const pct = parseInt(pctInput.value);
+
+    if (!ticker) {
+        feedback.textContent = 'Please enter a ticker symbol';
+        feedback.className = 'ticker-feedback invalid';
+        return;
+    }
+    if (!tickerCache[ticker]) {
+        feedback.textContent = 'Please select a ticker from the search results before adding';
+        feedback.className = 'ticker-feedback invalid';
+        return;
+    }
+    if (!pct || pct < 1 || pct > 100) {
+        feedback.textContent = 'Please enter a valid percentage (1-100)';
+        feedback.className = 'ticker-feedback invalid';
+        return;
+    }
+
+    const name = tickerCache[ticker].name;
+    const list = document.getElementById('instr-list-' + category);
+    const empty = document.getElementById('empty-' + category);
+    if (empty) empty.remove();
+
+    const rowId = 'instr-custom-' + Date.now();
+    const row = document.createElement('div');
+    row.className = 'instr-row';
+    row.id = rowId;
+    row.innerHTML =
+        '<div class="instr-row-ticker">' + ticker + '</div>' +
+        '<div class="instr-row-name">' + name + '</div>' +
+        '<div class="instr-row-pct">' + pct + '%</div>';
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'instr-remove-btn';
+    removeBtn.textContent = '×';
+    removeBtn.dataset.row = rowId;
+    removeBtn.dataset.category = category;
+    removeBtn.dataset.ticker = ticker;
+    row.appendChild(removeBtn);
+    list.appendChild(row);
+
+    const dollarAmount = Math.round((pct / 100) * window.CLIENT_PROFILE.amount);
+    if (!window.CURRENT_INSTRUMENTS[category]) window.CURRENT_INSTRUMENTS[category] = [];
+    window.CURRENT_INSTRUMENTS[category].push({
+        ticker: ticker, name: name, allocation_pct: pct, dollar_amount: dollarAmount,
+        reasoning: 'Added by advisor during edit.', conviction: 'Advisor Added', hold_period: 'Advisor Specified'
+    });
+
+    tickerInput.value = '';
+    pctInput.value = '';
+    feedback.textContent = '✓ ' + ticker + ' added';
+    feedback.className = 'ticker-feedback valid';
+
+    scheduleNoteRegeneration();
+}
+
+document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.instr-remove-btn');
+    if (btn) {
+        const row = document.getElementById(btn.dataset.row);
+        if (row) row.remove();
+        const category = btn.dataset.category;
+        const ticker = btn.dataset.ticker;
+        if (window.CURRENT_INSTRUMENTS[category]) {
+            window.CURRENT_INSTRUMENTS[category] = window.CURRENT_INSTRUMENTS[category]
+                .filter(inst => inst.ticker !== ticker);
+        }
+        scheduleNoteRegeneration();
+    }
+});
+
+let noteRegenTimer = null;
+let latestNote = null;
+function scheduleNoteRegeneration() {
+    clearTimeout(noteRegenTimer);
+    document.getElementById('note-status').textContent = '⏳ Suitability note will update when you save.';
+    latestNote = null;
+}
+
+function saveEdit() {
+    const total = Object.values(window.CURRENT_ALLOCATION).reduce((a, b) => a + b, 0);
+    if (total !== 100) {
+        alert('Total allocation must equal 100% before saving. Currently: ' + total + '%');
+        return;
+    }
+
+    const saveBtn = document.getElementById('save-btn');
+    saveBtn.disabled = true;
+    saveBtn.textContent = '⏳ Generating updated suitability note...';
+
+    fetch('/generate-suitability-note', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            client_name: window.CLIENT_PROFILE.client_name,
+            age: window.CLIENT_PROFILE.age,
+            life_stage: window.CLIENT_PROFILE.life_stage,
+            risk: window.CLIENT_PROFILE.risk,
+            horizon: window.CLIENT_PROFILE.horizon,
+            amount: window.CLIENT_PROFILE.amount,
+            option_id: window.OPTION_ID,
+            option_name: window.OPTION_NAME,
+            instruments: window.CURRENT_INSTRUMENTS,
+            market_data: {}
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        const note = data.success ? data.note : '';
+        document.getElementById('save-allocation').value = JSON.stringify(window.CURRENT_ALLOCATION);
+        document.getElementById('save-instruments').value = JSON.stringify(window.CURRENT_INSTRUMENTS);
+        document.getElementById('save-suitability-note').value = note;
+        document.getElementById('save-edit-form').submit();
+    })
+    .catch(() => {
+        saveBtn.disabled = false;
+        saveBtn.textContent = '💾 Save Changes';
+        alert('Could not generate updated suitability note. Please try again.');
+    });
+}
+</script>
+{% endblock %}
