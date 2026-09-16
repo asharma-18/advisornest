@@ -304,17 +304,14 @@
         {% endfor %}
         {% endif %}
 
-        <!-- Suitability note -->
+         <!-- Suitability note -->
         {% if rec.suitability_note %}
-        <div class="section-divider">Suitability Assessment Note</div>
-        <div class="reasoning-card">
-            <div style="font-size:0.8rem;color:var(--text-secondary);
-                        line-height:1.8;white-space:pre-wrap;
-                        background:var(--bg-primary);
-                        border:1px solid var(--border-light);
-                        border-radius:6px;padding:14px 16px">
-                {{ rec.suitability_note }}
+        <div class="reasoning-card" style="padding:24px 28px">
+            <div class="suitability-header-strip">
+                <div class="suitability-header-label">Suitability Assessment Note</div>
+                <div class="suitability-header-meta">AdvisorNest Decision Support</div>
             </div>
+            <div class="suitability-document">{{ rec.suitability_note }}</div>
         </div>
         {% endif %}
 

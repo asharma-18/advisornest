@@ -9,15 +9,20 @@
             ${{ "{:,}".format(client.amount) }} · {{ client.risk }} risk
         </p>
     </div>
-    <a href="{{ url_for('main.clients') }}" class="btn btn-ghost">
-        ← Back to Clients
-    </a>
-</div>
-<div class="card">
-    <div class="card-header">
-        <div class="card-title">Suitability Assessment Note</div>
+    <div style="display:flex;gap:10px">
+        <a href="{{ url_for('main.edit_client', client_id=client.id) }}" class="btn btn-outline">
+            ✏ Edit Recommendation
+        </a>
+        <a href="{{ url_for('main.clients') }}" class="btn btn-ghost">
+            ← Back to Clients
+        </a>
     </div>
-    <pre style="font-size:0.8rem;color:var(--text-secondary);
-    line-height:1.8;white-space:pre-wrap">{{ client.suitability_note }}</pre>
+</div>
+<div class="card" style="padding:24px 28px">
+    <div class="suitability-header-strip">
+        <div class="suitability-header-label">Suitability Assessment Note</div>
+        <div class="suitability-header-meta">AdvisorNest Decision Support</div>
+    </div>
+    <div class="suitability-document">{{ client.suitability_note }}</div>
 </div>
 {% endblock %}

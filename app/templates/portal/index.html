@@ -294,6 +294,44 @@
         line-height: 1.75; margin-bottom: 16px;
     }
 
+        .suitability-document {
+        background: var(--bg-primary);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 32px 40px;
+        font-family: var(--font-heading);
+        font-size: 0.9rem;
+        line-height: 1.9;
+        color: var(--text-primary);
+        white-space: pre-wrap;
+        min-height: 80px;
+    }
+
+    .suitability-header-strip {
+        border-bottom: 2px solid var(--navy);
+        padding-bottom: 12px;
+        margin-bottom: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+    }
+
+    .suitability-header-label {
+        font-family: var(--font-heading);
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: var(--navy);
+        letter-spacing: 0.02em;
+    }
+
+    .suitability-header-meta {
+        font-family: var(--font-body);
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
+
     .consideration-item {
         display: flex; align-items: flex-start;
         gap: 10px; font-size: 0.825rem;
@@ -558,6 +596,51 @@
         color: var(--text-muted) !important;
         font-style: italic !important;
     }
+
+    /* ── Ticker search dropdown ── */
+    .ticker-search-wrapper {
+        position: relative;
+        flex: 1;
+    }
+
+    .ticker-search-dropdown {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1.5px solid var(--border);
+        border-top: none;
+        border-radius: 0 0 6px 6px;
+        max-height: 220px;
+        overflow-y: auto;
+        z-index: 50;
+        box-shadow: var(--shadow-md);
+    }
+
+    .ticker-search-dropdown.open { display: block; }
+
+    .ticker-search-item {
+        padding: 8px 12px;
+        cursor: pointer;
+        font-size: 0.8rem;
+        border-bottom: 1px solid var(--border-light);
+    }
+
+    .ticker-search-item:last-child { border-bottom: none; }
+    .ticker-search-item:hover { background: var(--bg-primary); }
+
+    .ticker-search-item-ticker {
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+
+    .ticker-search-item-name {
+        color: var(--text-muted);
+        font-size: 0.75rem;
+    }
+
     @media (max-width: 768px) {
 
         /* ── Portal layout ── */
@@ -1015,21 +1098,13 @@
             {% endif %}
 
             <!-- Suitability Note -->
-            <div class="reasoning-card">
-                <div class="reasoning-title">
-                    📋 Suitability Assessment Note
-                    <span style="font-size:0.7rem;font-weight:400;
-                                 color:var(--text-muted);margin-left:8px">
-                        AI-generated compliance documentation
-                    </span>
+            <div class="reasoning-card" style="padding:24px 28px">
+                <div class="suitability-header-strip">
+                    <div class="suitability-header-label">Suitability Assessment Note</div>
+                    <div class="suitability-header-meta">AdvisorNest Decision Support</div>
                 </div>
                 <div id="suitability-note-{{ option.id }}"
-                     style="font-size:0.8rem;color:var(--text-secondary);
-                            line-height:1.8;white-space:pre-wrap;
-                            background:var(--bg-primary);
-                            border:1px solid var(--border-light);
-                            border-radius:6px;padding:14px 16px;
-                            min-height:80px">
+                     class="suitability-document">
                     {% if loop.first %}
                     ⏳ Generating compliance suitability note...
                     {% else %}
@@ -1163,8 +1238,10 @@
                                 <div class="instr-row-name">{{ inst.name }}</div>
                                 <div class="instr-row-pct">{{ inst.allocation_pct }}%</div>
                                 <button class="instr-remove-btn"
-                                        onclick="removeInstrument(
-                                            'instr-{{ option.id }}-{{ key }}-{{ loop.index0 }}')">
+                                        data-row="instr-{{ option.id }}-{{ key }}-{{ loop.index0 }}"
+                                        data-option="{{ option.id }}"
+                                        data-category="{{ key }}"
+                                        data-ticker="{{ inst.ticker }}">
                                     ×
                                 </button>
                             </div>
@@ -1178,13 +1255,18 @@
                     </div>
 
                     <div class="add-instr-row">
-                        <input type="text"
-                               class="add-instr-input"
-                               id="addticker-{{ option.id }}-{{ key }}"
-                               placeholder="Ticker (e.g. VOO)"
-                               maxlength="10"
-                               oninput="validateTicker(this,
-                                        '{{ option.id }}', '{{ key }}')">
+                        <div class="ticker-search-wrapper">
+                            <input type="text"
+                                   class="add-instr-input"
+                                   id="addticker-{{ option.id }}-{{ key }}"
+                                   placeholder="Search ticker or company name..."
+                                   maxlength="60"
+                                   autocomplete="off"
+                                   oninput="searchTicker(this,
+                                            '{{ option.id }}', '{{ key }}')">
+                            <div class="ticker-search-dropdown"
+                                 id="dropdown-{{ option.id }}-{{ key }}"></div>
+                        </div>
                         <input type="number"
                                class="add-instr-pct"
                                id="addpct-{{ option.id }}-{{ key }}"
@@ -1312,7 +1394,7 @@
         </style>
         </div>
         <div style="font-size:0.75rem;color:var(--text-muted)">
-            This usually takes 10-15 seconds
+            This usually takes 20-30 seconds
         </div>
     </div>
 </div>
@@ -1351,6 +1433,11 @@ window.CUSTOM_ALLOCATIONS = {
     "{{ option.id }}": {{ option.allocation | tojson }}{% if not loop.last %},{% endif %}
     {% endfor %}
 };
+window.CUSTOM_INSTRUMENTS = {
+    {% for option in result.ai_options %}
+    "{{ option.id }}": {{ option.instruments | tojson }}{% if not loop.last %},{% endif %}
+    {% endfor %}
+};
 
 window.AI_OPTIONS = {{ result.ai_options | tojson }};
 
@@ -1368,6 +1455,8 @@ window.CLIENT_PROFILE = {
     horizon:     {{ result.horizon }},
     amount:      {{ result.amount }}
 };
+
+
 </script>
 {% endif %}
 
@@ -1451,7 +1540,7 @@ function selectOption(optionId) {
     generateSuitabilityNote(optionId);
 }
 
-function generateSuitabilityNote(optionId) {
+function generateSuitabilityNote(optionId, force) {
     if (!window.AI_OPTIONS || !window.CLIENT_PROFILE) return;
 
     const option = window.AI_OPTIONS.find(function(o) {
@@ -1462,12 +1551,19 @@ function generateSuitabilityNote(optionId) {
     const noteEl = document.getElementById('suitability-note-' + optionId);
     if (!noteEl) return;
 
-    // Check if already generated
-    if (noteEl.dataset.generated === 'true') return;
+    // Only skip if already generated AND this isn't a forced refresh
+    if (!force && noteEl.dataset.generated === 'true') return;
 
-    noteEl.textContent = '⏳ Generating compliance suitability note...';
+    const currentInstruments = (window.CUSTOM_INSTRUMENTS && window.CUSTOM_INSTRUMENTS[optionId])
+        ? window.CUSTOM_INSTRUMENTS[optionId]
+        : (option.instruments || {});
+
+    noteEl.textContent = force
+        ? '⏳ Updating suitability note to reflect your changes...'
+        : '⏳ Generating compliance suitability note...';
     noteEl.style.fontStyle = 'italic';
     noteEl.style.color = 'var(--text-muted)';
+    noteEl.dataset.generated = 'false';
 
     fetch('/generate-suitability-note', {
         method: 'POST',
@@ -1481,7 +1577,7 @@ function generateSuitabilityNote(optionId) {
             amount:      window.CLIENT_PROFILE.amount,
             option_id:   option.id,
             option_name: option.name,
-            instruments: option.instruments || {},
+            instruments: currentInstruments,
             market_data: window.AI_MARKET_DATA || {}
         })
     })
@@ -1493,7 +1589,6 @@ function generateSuitabilityNote(optionId) {
             noteEl.style.color = '';
             noteEl.dataset.generated = 'true';
 
-            // Update hidden field for saving
             const saveNote = document.getElementById('save-suitability');
             if (saveNote) saveNote.value = data.note;
         } else {
@@ -1565,7 +1660,7 @@ function onSliderChange(optionId, changedKey, newValue) {
             (total === 100 ? 'ok' : 'over');
     }
 
-    const warnEl = document.getElementById('total-warn-' + optionId);
+     const warnEl = document.getElementById('total-warn-' + optionId);
     if (warnEl) {
         if (total !== 100) {
             warnEl.style.display = 'block';
@@ -1576,63 +1671,94 @@ function onSliderChange(optionId, changedKey, newValue) {
             warnEl.style.display = 'none';
         }
     }
+
+    scheduleNoteRegeneration(optionId);
 }
 
-let validateTimer = null;
+let searchTimer = null;
 const tickerCache = {};
 
-function validateTicker(input, optionId, category) {
-    const ticker   = input.value.trim().toUpperCase();
-    const feedback = document.getElementById(
-        'feedback-' + optionId + '-' + category);
+function searchTicker(input, optionId, category) {
+    const query    = input.value.trim();
+    const dropdown = document.getElementById('dropdown-' + optionId + '-' + category);
+    const feedback = document.getElementById('feedback-' + optionId + '-' + category);
 
-    if (!ticker) {
-        if (feedback) feedback.textContent = '';
+    if (feedback) feedback.textContent = '';
+
+    if (!query || query.length < 2) {
+        if (dropdown) { dropdown.classList.remove('open'); dropdown.innerHTML = ''; }
         return;
     }
 
-    if (tickerCache[ticker]) {
-        const data = tickerCache[ticker];
-        if (feedback) {
-            feedback.textContent = '✓ ' + data.name;
-            feedback.className = 'ticker-feedback valid';
-        }
-        return;
-    }
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(function() {
+        fetch('/market-watch-data', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({type: 'search', ticker: query})
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!dropdown) return;
 
-    clearTimeout(validateTimer);
-    if (feedback) {
-        feedback.textContent = 'Checking...';
-        feedback.className = 'ticker-feedback loading';
-    }
+            if (!data.success || !data.matches || data.matches.length === 0) {
+                dropdown.innerHTML = '<div class="ticker-search-item" style="color:var(--text-muted)">No matches found</div>';
+                dropdown.classList.add('open');
+                return;
+            }
 
-    validateTimer = setTimeout(function() {
-        fetch('/validate-ticker/' + ticker)
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                if (data.valid) {
-                    tickerCache[ticker] = data;
-                    if (feedback) {
-                        feedback.textContent = '✓ ' + data.name +
-                            (data.price ? ' · $' + data.price : '');
-                        feedback.className = 'ticker-feedback valid';
-                    }
-                } else {
-                    if (feedback) {
-                        feedback.textContent = '✗ Ticker not found';
-                        feedback.className = 'ticker-feedback invalid';
-                    }
-                }
-            })
-            .catch(function() {
-                if (feedback) {
-                    feedback.textContent = 'Could not validate';
-                    feedback.className = 'ticker-feedback invalid';
-                }
+             dropdown.innerHTML = '';
+            data.matches.forEach(function(m) {
+                const item = document.createElement('div');
+                item.className = 'ticker-search-item';
+                item.dataset.ticker = m.ticker;
+                item.dataset.name = m.name;
+                item.innerHTML = '<span class="ticker-search-item-ticker">' + m.ticker +
+                    '</span> — <span class="ticker-search-item-name">' + m.name + '</span>';
+                item.addEventListener('click', function() {
+                    selectTickerFromSearch(optionId, category, this.dataset.ticker, this.dataset.name);
+                });
+                dropdown.appendChild(item);
             });
-    }, 600);
+            dropdown.classList.add('open');
+        })
+        .catch(function() {
+            dropdown.innerHTML = '<div class="ticker-search-item" style="color:var(--error)">Search failed</div>';
+            dropdown.classList.add('open');
+        });
+    }, 400);
 }
 
+function selectTickerFromSearch(optionId, category, ticker, name) {
+    const tickerInput = document.getElementById('addticker-' + optionId + '-' + category);
+    const dropdown     = document.getElementById('dropdown-' + optionId + '-' + category);
+    const feedback     = document.getElementById('feedback-' + optionId + '-' + category);
+
+    if (tickerInput) tickerInput.value = ticker;
+    if (dropdown) { dropdown.classList.remove('open'); dropdown.innerHTML = ''; }
+
+    tickerCache[ticker] = { name: name };
+
+    if (feedback) {
+        feedback.textContent = '✓ ' + name;
+        feedback.className = 'ticker-feedback valid';
+    }
+}
+
+// Close dropdowns when clicking elsewhere on the page
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.ticker-search-wrapper')) {
+        document.querySelectorAll('.ticker-search-dropdown').forEach(function(d) {
+            d.classList.remove('open');
+        });
+    }
+});
+document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.instr-remove-btn');
+    if (btn) {
+        removeInstrument(btn.dataset.row, btn.dataset.option, btn.dataset.category, btn.dataset.ticker);
+    }
+});
 function addInstrument(optionId, category) {
     const tickerInput = document.getElementById(
         'addticker-' + optionId + '-' + category);
@@ -1647,6 +1773,14 @@ function addInstrument(optionId, category) {
     if (!ticker) {
         if (feedback) {
             feedback.textContent = 'Please enter a ticker symbol';
+            feedback.className = 'ticker-feedback invalid';
+        }
+        return;
+    }
+
+    if (!tickerCache[ticker]) {
+        if (feedback) {
+            feedback.textContent = 'Please select a ticker from the search results before adding';
             feedback.className = 'ticker-feedback invalid';
         }
         return;
@@ -1676,10 +1810,31 @@ function addInstrument(optionId, category) {
     row.innerHTML =
         '<div class="instr-row-ticker">' + ticker + '</div>' +
         '<div class="instr-row-name">' + name + '</div>' +
-        '<div class="instr-row-pct">' + pct + '%</div>' +
-        '<button class="instr-remove-btn" onclick="removeInstrument(\'' +
-        rowId + '\')">×</button>';
+        '<div class="instr-row-pct">' + pct + '%</div>';
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'instr-remove-btn';
+    removeBtn.textContent = '×';
+    removeBtn.dataset.row = rowId;
+    removeBtn.dataset.option = optionId;
+    removeBtn.dataset.category = category;
+    removeBtn.dataset.ticker = ticker;
+    row.appendChild(removeBtn);
+
     if (list) list.appendChild(row);
+
+    if (!window.CUSTOM_INSTRUMENTS[optionId]) window.CUSTOM_INSTRUMENTS[optionId] = {};
+    if (!window.CUSTOM_INSTRUMENTS[optionId][category]) window.CUSTOM_INSTRUMENTS[optionId][category] = [];
+    const dollarAmount = window.CLIENT_PROFILE ? Math.round((pct / 100) * window.CLIENT_PROFILE.amount) : 0;
+    window.CUSTOM_INSTRUMENTS[optionId][category].push({
+        ticker: ticker,
+        name: name,
+        allocation_pct: pct,
+        dollar_amount: dollarAmount,
+        reasoning: 'Added by advisor during customization.',
+        conviction: 'Advisor Added',
+        hold_period: 'Advisor Specified'
+    });
 
     if (tickerInput) tickerInput.value = '';
     if (pctInput) pctInput.value = '';
@@ -1688,18 +1843,36 @@ function addInstrument(optionId, category) {
         feedback.className = 'ticker-feedback valid';
         setTimeout(function() { feedback.textContent = ''; }, 2000);
     }
+
+    scheduleNoteRegeneration(optionId);
 }
 
-function removeInstrument(rowId) {
+function removeInstrument(rowId, optionId, category, ticker) {
     const row = document.getElementById(rowId);
     if (row) row.remove();
+
+    if (window.CUSTOM_INSTRUMENTS && window.CUSTOM_INSTRUMENTS[optionId] &&
+        window.CUSTOM_INSTRUMENTS[optionId][category]) {
+        window.CUSTOM_INSTRUMENTS[optionId][category] =
+            window.CUSTOM_INSTRUMENTS[optionId][category].filter(function(inst) {
+                return inst.ticker !== ticker;
+            });
+    }
+
+    scheduleNoteRegeneration(optionId);
 }
 
 function saveClient(optionId, optionName, useCustom) {
+    if (window.saveInProgress) return;
+    window.saveInProgress = true;
+
     const portalForm = document.getElementById('portal-form');
     const saveForm   = document.getElementById('master-save-form');
 
-    if (!portalForm || !saveForm) return;
+    if (!portalForm || !saveForm) {
+        window.saveInProgress = false;
+        return;
+    }
 
     ['client_name', 'age', 'life_stage', 'amount', 'horizon'].forEach(
         function(name) {
@@ -1726,25 +1899,50 @@ function saveClient(optionId, optionName, useCustom) {
     // Get the current suitability note from the display element
     const noteEl = document.getElementById('suitability-note-' + optionId);
     const saveNote = document.getElementById('save-suitability');
+
+    if (noteEl && noteEl.dataset.generated !== 'true') {
+        alert('The suitability note is still updating to reflect your changes. Please wait a moment and try saving again.');
+        return;
+    }
+
     if (noteEl && saveNote && noteEl.dataset.generated === 'true') {
         saveNote.value = noteEl.textContent;
     }
 
-    // Save full AI data
+    // Save full AI data — if customized, merge in the advisor's edited
+    // instruments/allocation for this option so anything reading ai_data
+    // later (PDF report, Portfolio Review drift) sees what was actually saved.
+    let optionsToSave = window.AI_OPTIONS || [];
+    if (useCustom) {
+        optionsToSave = optionsToSave.map(function(opt) {
+            if (opt.id !== optionId) return opt;
+            return Object.assign({}, opt, {
+                allocation: window.CUSTOM_ALLOCATIONS[optionId] || opt.allocation,
+                instruments: window.CUSTOM_INSTRUMENTS[optionId] || opt.instruments
+            });
+        });
+    }
+
     const aiDataEl = document.getElementById('save-ai_data');
     if (aiDataEl) {
         try {
             aiDataEl.value = JSON.stringify({
-                options:        window.AI_OPTIONS        || [],
-                market_context: window.AI_MARKET_CONTEXT || '',
-                advisor_note:   window.AI_ADVISOR_NOTE   || ''
+                options:        optionsToSave             || [],
+                market_context: window.AI_MARKET_CONTEXT  || '',
+                advisor_note:   window.AI_ADVISOR_NOTE    || ''
             });
         } catch(e) {
             aiDataEl.value = '{}';
         }
     }
-
     saveForm.submit();
+}
+const noteRegenTimers = {};
+function scheduleNoteRegeneration(optionId) {
+    clearTimeout(noteRegenTimers[optionId]);
+    noteRegenTimers[optionId] = setTimeout(function() {
+        generateSuitabilityNote(optionId, true);
+    }, 800);
 }
 </script>
 {% endblock %}
