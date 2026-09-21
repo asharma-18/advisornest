@@ -2,15 +2,24 @@ from concurrent.futures import ThreadPoolExecutor
 import yfinance as yf
 import requests
 import os
-from dotenv import load_dotenv
-
-load_dotenv()
 import threading
 import time
+from dotenv import load_dotenv
+import redis
+
+_redis_client = None
+
+def get_redis():
+    global _redis_client
+    if _redis_client is None:
+        redis_url = os.getenv("REDIS_URL")
+        _redis_client = redis.from_url(redis_url, decode_responses=True)
+    return _redis_client
+load_dotenv()
 
 _enriched_data_cache = {"data": {}, "timestamp": 0}
 _enriched_data_lock = threading.Lock()
-ENRICHED_DATA_TTL_SECONDS = 7200  # 2 hours
+ENRICHED_DATA_TTL_SECONDS = 3600  # 1 hour
 
 # ── Curated instrument lists by risk ─────────────────────
 STOCKS_LONG_TERM = {
@@ -188,6 +197,7 @@ def fetch_instrument_prices(instruments):
 
     return prices
 
+
 def get_enriched_instrument_data(tickers):
     """
     Fetches current fundamental data (price, P/E, dividend yield) for
@@ -217,26 +227,33 @@ def get_enriched_instrument_data(tickers):
 
     return {k: v for k, v in results.items() if v is not None}
 
+
 def get_cached_enriched_data(tickers):
     """
-    Returns enriched instrument data from cache if fresh, otherwise
-    fetches once and caches for all tickers together, shared across
-    every recommendation generated within the TTL window. The lock is
-    held across the fetch itself so concurrent callers (e.g. all 4
-    options generating in parallel) don't each redundantly re-fetch
-    on a cold cache — only the first one fetches, others wait and
-    reuse its result.
+    Returns enriched instrument data from Redis cache if fresh,
+    otherwise fetches and caches per-ticker. Each ticker is stored as
+    its own Redis key with a TTL, so multiple workers share the exact
+    same cached data and don't each fetch independently.
     """
-    now = time.time()
+    import json as _json
 
-    with _enriched_data_lock:
-        cached = _enriched_data_cache
-        if cached["data"] and (now - cached["timestamp"]) < ENRICHED_DATA_TTL_SECONDS:
-            missing = [t for t in tickers if t not in cached["data"] and not t.startswith("CD-") and t != "TBILL"]
-            if not missing:
-                return cached["data"]
+    r = get_redis()
+    result = {}
+    missing = []
 
-        fresh_data = get_enriched_instrument_data(tickers)
-        _enriched_data_cache["data"] = fresh_data
-        _enriched_data_cache["timestamp"] = now
-        return fresh_data
+    for ticker in tickers:
+        if ticker.startswith("CD-") or ticker == "TBILL":
+            continue
+        cached = r.get(f"enriched:{ticker}")
+        if cached:
+            result[ticker] = _json.loads(cached)
+        else:
+            missing.append(ticker)
+
+    if missing:
+        fresh_data = get_enriched_instrument_data(missing)
+        for ticker, data in fresh_data.items():
+            r.setex(f"enriched:{ticker}", ENRICHED_DATA_TTL_SECONDS, _json.dumps(data))
+            result[ticker] = data
+
+    return result

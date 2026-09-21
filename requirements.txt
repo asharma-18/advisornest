@@ -11,3 +11,4 @@ pandas
 gunicorn
 feedparser
 apscheduler
+redis

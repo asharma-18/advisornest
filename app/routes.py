@@ -2,7 +2,7 @@ from portfolio_snapshots_db import save_snapshot, get_client_snapshots
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
 from auth import login_advisor, register_advisor
 from logic import calculate_allocation, portfolio_score, get_advisor_flags, generate_suitability_note
-from market_data import get_all_market_data, fetch_instrument_prices
+from market_data import get_all_market_data, fetch_instrument_prices, get_redis
 from clients_db import save_client, get_all_clients, get_client, delete_client, get_client_count, update_client
 from notes_db import get_all_notes, get_client_notes, add_note, delete_note, get_note_count, update_note
 from recommendations_db import (
@@ -1456,10 +1456,6 @@ def portfolio_drift():
 
 DRIFT_CACHE_TTL_SECONDS = 3600  # 1 hour
 
-_drift_cache = {}
-_drift_cache_lock = threading.Lock()
-
-
 def _get_client_drift_summary(advisor_id, client_id):
     try:
         recs = get_client_recommendations(advisor_id, client_id)
@@ -1493,7 +1489,7 @@ def _get_client_drift_summary(advisor_id, client_id):
 
         max_drift = max(abs(r["drift_pct"]) for r in results)
         total_value = sum(r["current_value"] for r in results)
-        status = "needs_rebalancing" if max_drift > 2 else "on_target"
+        status = "needs_rebalancing" if max_drift > 5 else "on_target"
 
         save_snapshot(advisor_id, client_id, total_value)
 
@@ -1505,18 +1501,19 @@ def _get_client_drift_summary(advisor_id, client_id):
 
 
 def _get_cached_drift_summary(advisor_id, client_id):
+    import json as _json
+
+    r = get_redis()
+    cache_key = f"drift:{advisor_id}:{client_id}"
+
+    cached = r.get(cache_key)
+    if cached:
+        parsed = _json.loads(cached)
+        return parsed["summary"], parsed["timestamp"]
+
     now = time.time()
-    cache_key = f"{advisor_id}:{client_id}"
-
-    with _drift_cache_lock:
-        cached = _drift_cache.get(cache_key)
-
-    if cached and (now - cached["timestamp"]) < DRIFT_CACHE_TTL_SECONDS:
-        return cached["summary"], cached["timestamp"]
-
     summary = _get_client_drift_summary(advisor_id, client_id)
-    with _drift_cache_lock:
-        _drift_cache[cache_key] = {"summary": summary, "timestamp": now}
+    r.setex(cache_key, DRIFT_CACHE_TTL_SECONDS, _json.dumps({"summary": summary, "timestamp": now}))
     return summary, now
 
 def refresh_all_drift_caches():
@@ -1532,11 +1529,12 @@ def refresh_all_drift_caches():
 
         def refresh_one(pair):
             advisor_id, client_id = pair
+            import json as _json
+            r = get_redis()
             now = time.time()
             summary = _get_client_drift_summary(advisor_id, client_id)
-            cache_key = f"{advisor_id}:{client_id}"
-            with _drift_cache_lock:
-                _drift_cache[cache_key] = {"summary": summary, "timestamp": now}
+            cache_key = f"drift:{advisor_id}:{client_id}"
+            r.setex(cache_key, DRIFT_CACHE_TTL_SECONDS, _json.dumps({"summary": summary, "timestamp": now}))
 
         all_pairs = []
         for advisor_id in advisor_ids:
