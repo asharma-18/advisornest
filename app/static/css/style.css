@@ -805,7 +805,10 @@ tr:hover td {
     color: white;
     display: block;
 }
-
+.sidebar-logo-link {
+    text-decoration: none;
+    display: block;
+}
 .sidebar-logo-text span {
     color: var(--accent);
     font-style: italic;

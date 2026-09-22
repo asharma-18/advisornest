@@ -17,10 +17,14 @@
 
     <!-- ── Desktop Sidebar ─────────────────────────────── -->
     <aside class="sidebar">
+    <a href="{{ url_for('main.home') }}" style="text-decoration:none;">
         <div class="sidebar-logo">
-            <div class="sidebar-logo-text">Advisor<span>Nest</span></div>
+            <a href="{{ url_for('main.dashboard') }}" class="sidebar-logo-link">
+                <div class="sidebar-logo-text">Advisor<span>Nest</span></div>
+            </a>
             <div class="sidebar-logo-sub">Portfolio Intelligence</div>
         </div>
+    </a>
         <div class="sidebar-gold-bar"></div>
         <nav class="sidebar-nav">
             <a href="{{ url_for('main.dashboard') }}"
@@ -84,9 +88,11 @@
 
         <!-- ── Mobile Top Bar ──────────────────────────── -->
         <div class="mobile-topbar">
+        <a href="{{ url_for('main.home') }}" style="text-decoration:none;">
             <div class="mobile-topbar-logo">
                 Advisor<span>Nest</span>
             </div>
+        </a>
             <div class="mobile-topbar-advisor">
             {{ session.get('advisor', {}).get('full_name', '').split()[0] }} · {{ session.get('advisor', {}).get('firm_name') or 'Independent' }}
             </div>

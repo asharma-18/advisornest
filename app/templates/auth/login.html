@@ -32,6 +32,8 @@
         font-size: 1.3rem;
         font-weight: 700;
         color: white;
+        text-decoration: none;
+        cursor: pointer;
     }
 
     .auth-nav-logo span {
@@ -448,9 +450,9 @@
 
     <!-- ── Navy Navbar ── -->
     <div class="auth-nav">
-        <div class="auth-nav-logo">
+        <a href="{{ url_for('main.home') }}" class="auth-nav-logo">
             Advisor<span>Nest</span>
-        </div>
+        </a>
         <div class="auth-nav-links">
             <a href="{{ url_for('main.login') }}"
                class="auth-nav-link active">Log In</a>

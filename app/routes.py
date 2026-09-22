@@ -227,7 +227,7 @@ main = Blueprint("main", __name__)
 def home():
     if session.get("logged_in"):
         return redirect(url_for("main.dashboard"))
-    return redirect(url_for("main.login"))
+    return render_template("homepage.html")
 
 
 # ── Login ─────────────────────────────────────────────────
