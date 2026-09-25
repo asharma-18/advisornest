@@ -1,23 +1,26 @@
 import os
 import smtplib
+import threading
 from email.mime.text import MIMEText
 from datetime import datetime, timezone
 
 
 def send_fallback_alert(client_name, advisor_email, reason):
     """
-    Sends a quiet email to you (the admin) whenever a recommendation
-    used rule-based fallback instead of full AI generation — either
-    partially (some options) or fully (all 4 options).
-
-    Requires these Railway environment variables to be set:
-    - ALERT_SENDER_EMAIL          (a Gmail address you control)
-    - ALERT_SENDER_APP_PASSWORD   (a Gmail "App Password", not your normal password)
-    - ALERT_RECIPIENT_EMAIL       (optional — where the alert goes; defaults to the sender address)
-
-    If these aren't set, it just logs to the console instead of crashing
-    anything — a missing alert should never break a recommendation.
+    Fires the alert email in a background thread so a slow or blocked
+    SMTP connection can NEVER hang or crash the actual recommendation
+    request again. The advisor's response is returned immediately;
+    the email attempt happens separately.
     """
+    thread = threading.Thread(
+        target=_send_email,
+        args=(client_name, advisor_email, reason),
+        daemon=True
+    )
+    thread.start()
+
+
+def _send_email(client_name, advisor_email, reason):
     sender = os.getenv("ALERT_SENDER_EMAIL")
     password = os.getenv("ALERT_SENDER_APP_PASSWORD")
     recipient = os.getenv("ALERT_RECIPIENT_EMAIL", sender)
@@ -43,12 +46,10 @@ def send_fallback_alert(client_name, advisor_email, reason):
     msg["To"] = recipient
 
     try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+        # timeout=10 — fail fast instead of hanging if the host blocks SMTP
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=10) as server:
             server.login(sender, password)
             server.sendmail(sender, [recipient], msg.as_string())
         print(f"Fallback alert email sent for client: {client_name}")
     except Exception as e:
-        # Never let a failed alert email break the actual recommendation flow
         print(f"Failed to send fallback alert email: {str(e)}")
-
-        
