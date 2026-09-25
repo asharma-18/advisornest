@@ -1,16 +1,13 @@
 import os
-import smtplib
 import threading
-from email.mime.text import MIMEText
+import requests
 from datetime import datetime, timezone
 
 
 def send_fallback_alert(client_name, advisor_email, reason):
     """
-    Fires the alert email in a background thread so a slow or blocked
-    SMTP connection can NEVER hang or crash the actual recommendation
-    request again. The advisor's response is returned immediately;
-    the email attempt happens separately.
+    Fires the alert email in a background thread so it can never
+    hold up or crash the actual recommendation request.
     """
     thread = threading.Thread(
         target=_send_email,
@@ -21,12 +18,11 @@ def send_fallback_alert(client_name, advisor_email, reason):
 
 
 def _send_email(client_name, advisor_email, reason):
-    sender = os.getenv("ALERT_SENDER_EMAIL")
-    password = os.getenv("ALERT_SENDER_APP_PASSWORD")
-    recipient = os.getenv("ALERT_RECIPIENT_EMAIL", sender)
+    api_key = os.getenv("RESEND_API_KEY")
+    recipient = os.getenv("ALERT_RECIPIENT_EMAIL")
 
-    if not sender or not password:
-        print("Fallback alert email skipped — ALERT_SENDER_EMAIL / ALERT_SENDER_APP_PASSWORD not set")
+    if not api_key or not recipient:
+        print("Fallback alert email skipped — RESEND_API_KEY / ALERT_RECIPIENT_EMAIL not set")
         return
 
     subject = f"AdvisorNest: AI fallback used for {client_name}"
@@ -40,16 +36,21 @@ def _send_email(client_name, advisor_email, reason):
         f"'Option X attempt N' lines around this time to see the exact cause."
     )
 
-    msg = MIMEText(body)
-    msg["Subject"] = subject
-    msg["From"] = sender
-    msg["To"] = recipient
-
     try:
-        # timeout=10 — fail fast instead of hanging if the host blocks SMTP
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=10) as server:
-            server.login(sender, password)
-            server.sendmail(sender, [recipient], msg.as_string())
-        print(f"Fallback alert email sent for client: {client_name}")
+        response = requests.post(
+            "https://api.resend.com/emails",
+            headers={"Authorization": f"Bearer {api_key}"},
+            json={
+                "from": "AdvisorNest Alerts <onboarding@resend.dev>",
+                "to": [recipient],
+                "subject": subject,
+                "text": body,
+            },
+            timeout=10
+        )
+        if response.status_code == 200:
+            print(f"Fallback alert email sent for client: {client_name}")
+        else:
+            print(f"Failed to send fallback alert email: {response.status_code} {response.text}")
     except Exception as e:
         print(f"Failed to send fallback alert email: {str(e)}")
