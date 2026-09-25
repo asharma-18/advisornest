@@ -70,89 +70,17 @@ OPTION_DEFINITIONS = {
     }
 }
 
-# ── Risk-tiered instrument pools ──────────────────────────
-# Each option (A-D) draws from a tier appropriate to how conservative
-# or aggressive it is. This keeps the enrichment data fetch small and
-# fast (10-20 tickers instead of ~75), and ensures every ticker the
-# AI is allowed to pick already has real current data behind it.
-OPTION_TIER = {"A": "low", "B": "low", "C": "medium", "D": "high"}
-
-EQUITY_ETF_TIERS = {
-    "low":    ["VOO", "VTI", "SCHD", "VYM", "DGRO", "NOBL", "DVY"],
-    "medium": ["VOO", "VTI", "ITOT", "SCHB", "IVV", "VUG", "SCHG", "VXUS", "VEA", "QQQ", "EFA"],
-    "high":   ["VWO", "XLK", "XLF", "XLV", "XLE"]
-}
-
-GROWTH_STOCK_TIERS = {
-    "low":    ["JNJ", "PG", "KO"],
-    "medium": ["MSFT", "AAPL", "JNJ", "UNH", "PG", "KO", "JPM", "HD", "V", "MA", "LIN", "ABT"],
-    "high":   ["NVDA", "GOOGL", "AMZN", "META", "CRM", "ADBE", "NFLX", "NOW", "INTU", "ISRG", "AMD", "PANW", "SNPS", "LRCX"]
-}
-
-BOND_ETF_TIERS = {
-    "low":    ["BND", "AGG", "MUB", "TIP", "SHY", "IEF"],
-    "medium": ["BND", "AGG", "BNDX", "LQD", "IEF"],
-    "high":   ["HYG", "TLT"]
-}
-
-MUTUAL_FUND_TIERS = {
-    "low":    ["VBTLX"],
-    "medium": ["VFIAX", "FXAIX", "VWELX", "SWPPX"],
-    "high":   ["FOCPX", "VIMAX", "AGTHX", "FCNTX", "FBGRX", "PRGFX"]
-}
-
-CD_LIST = ["CD-3M", "CD-6M", "CD-1Y", "CD-2Y", "TBILL"]
-
-
-def _validate_and_fix_allocations(option, amount):
-    """
-    Ensures each category's instrument allocation_pct values sum
-    exactly to that category's stated allocation. If they don't,
-    scales the instruments proportionally to close the gap and
-    recalculates dollar_amount accordingly. Logs when a fix happens.
-    """
-    allocation = option.get("allocation", {})
-    instruments = option.get("instruments", {})
-
-    for category, target_pct in allocation.items():
-        cat_instruments = instruments.get(category, [])
-
-        if not target_pct or target_pct == 0:
-            continue
-
-        current_sum = sum(inst.get("allocation_pct", 0) for inst in cat_instruments)
-
-        if current_sum == target_pct:
-            continue
-
-        if not cat_instruments:
-            print(f"[AI VALIDATION] Option {option.get('id')} — {category} has {target_pct}% target but no instruments to scale. Skipping.")
-            continue
-
-        print(f"[AI VALIDATION] Option {option.get('id')} — {category} instruments summed to {current_sum}% instead of {target_pct}%. Auto-correcting.")
-
-        scale_factor = target_pct / current_sum if current_sum > 0 else 0
-
-        running_total = 0
-        for i, inst in enumerate(cat_instruments):
-            if i == len(cat_instruments) - 1:
-                new_pct = target_pct - running_total
-            else:
-                new_pct = round(inst.get("allocation_pct", 0) * scale_factor)
-                running_total += new_pct
-
-            inst["allocation_pct"] = new_pct
-            inst["dollar_amount"] = round((new_pct / 100) * amount)
-
-    return option
-
 
 def generate_single_option(
     option_id, client_name, age, life_stage,
-    risk, horizon, amount, market_data
+    risk, horizon, amount, market_data, max_retries=2
 ):
-    from market_data import get_cached_enriched_data
-
+    """
+    Generates one portfolio option via OpenAI.
+    UPDATED: now retries up to `max_retries` times, and instead of crashing
+    when the API returns no content (None), it logs the real reason
+    (refusal text or finish_reason) and retries before giving up.
+    """
     rates = market_data.get("rates", {})
     treasury_10y = rates.get("10_year_treasury", "N/A")
     treasury_1y  = rates.get("1_year_treasury", "N/A")
@@ -160,29 +88,6 @@ def generate_single_option(
 
     opt = OPTION_DEFINITIONS[option_id]
     ranges = opt["ranges"]
-
-    # ── Risk-scoped instrument universe for this option ──────
-    tier = OPTION_TIER.get(option_id, "medium")
-    equity_tickers = EQUITY_ETF_TIERS.get(tier, EQUITY_ETF_TIERS["medium"])
-    growth_tickers = GROWTH_STOCK_TIERS.get(tier, GROWTH_STOCK_TIERS["medium"])
-    bond_tickers   = BOND_ETF_TIERS.get(tier, BOND_ETF_TIERS["medium"])
-    fund_tickers   = MUTUAL_FUND_TIERS.get(tier, MUTUAL_FUND_TIERS["medium"])
-
-    all_tickers_for_option = equity_tickers + growth_tickers + bond_tickers + fund_tickers
-    enriched_data = get_cached_enriched_data(all_tickers_for_option)
-
-    enriched_text_lines = []
-    for ticker in all_tickers_for_option:
-        data = enriched_data.get(ticker)
-        if not data:
-            continue
-        parts = [f"{ticker}: price ${data['price']}"]
-        if data.get("pe_ratio"):
-            parts.append(f"P/E {data['pe_ratio']}")
-        if data.get("dividend_yield"):
-            parts.append(f"dividend yield {data['dividend_yield']}%")
-        enriched_text_lines.append(" — ".join(parts))
-    enriched_text = "\n".join(enriched_text_lines)
 
     prompt = f"""You are a senior portfolio analyst providing DECISION SUPPORT to licensed financial advisors.
 
@@ -214,21 +119,18 @@ STRICT ALLOCATION RANGES FOR THIS OPTION (must stay within these):
 
 APPROVED INSTRUMENTS ONLY:
 
-EQUITY ETFs: {", ".join(equity_tickers)}
+EQUITY ETFs: VOO, VTI, ITOT, SCHB, IVV, SCHD, VYM, DGRO, NOBL, DVY, QQQ, VUG, SCHG, IWF, VXUS, VEA, VWO, EFA, XLK, XLF, XLV, XLE, XLU, XLP, XLI, AOM, AOA, AOK
 hold_period: "Core — Long Term Hold" or "Tactical — 12 to 18 Months"
 
-GROWTH STOCKS: {", ".join(growth_tickers)}
+GROWTH STOCKS: MSFT, AAPL, GOOGL, AMZN, NVDA, META, JNJ, UNH, PFE, ABBV, JPM, BAC, WFC, GS, HD, MCD, COST, CAT, HON, UNP, BRK-B, PG, KO
 hold_period: "Strategic — 5 to 10 Years", "Strategic — 10+ Years", "Tactical — 6 to 12 Months", "Tactical — 12 to 18 Months"
 
-BOND ETFs: {", ".join(bond_tickers)}
+BOND ETFs: BND, AGG, BNDX, TLT, IEF, SHY, LQD, HYG, TIP, MUB
 hold_period: "Income — Long Term Hold" or "Duration Play — 12 to 24 Months"
 
-MUTUAL FUNDS: {", ".join(fund_tickers)}
+MUTUAL FUNDS: VFIAX, VBTLX, VWELX, FXAIX, FZROX, PIMIX, DODGX
 
-CDs: {", ".join(CD_LIST)}
-
-CURRENT DATA FOR APPROVED INSTRUMENTS (use this real data to inform your selections):
-{enriched_text}
+CDs: CD-3M, CD-6M, CD-1Y, CD-2Y, TBILL
 
 RULES:
 - Only use instruments from the approved lists above
@@ -282,43 +184,59 @@ Calculate dollar_amount as (allocation_pct / 100) * {amount}
 Replace example instruments with your actual picks from the approved lists.
 Return ONLY valid JSON. No markdown. No explanation."""
 
-    try:
-        response = get_client().chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "system",
-                    "content": f"You are generating Option {option_id} — {opt['name']} for a portfolio recommendation tool. Return only valid JSON. Never use instruments outside the approved universe. Keep allocations strictly within the specified ranges."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            max_tokens=1200,
-            temperature=0.2
-        )
+    last_error = "unknown error"
 
-        content = response.choices[0].message.content.strip()
+    for attempt in range(max_retries):
+        try:
+            response = get_client().chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": f"You are generating Option {option_id} — {opt['name']} for a portfolio recommendation tool. Return only valid JSON. Never use instruments outside the approved universe. Keep allocations strictly within the specified ranges."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                max_tokens=1200,
+                temperature=0.2
+            )
 
-        if content.startswith("```"):
-            content = content.split("```")[1]
-            if content.startswith("json"):
-                content = content[4:]
-        if content.endswith("```"):
-            content = content[:-3]
+            message = response.choices[0].message
 
-        option = json.loads(content.strip())
-        option = _validate_and_fix_allocations(option, amount)
-        return {"success": True, "option": option}
+            if message.content is None:
+                last_error = (
+                    getattr(message, "refusal", None)
+                    or f"empty content, finish_reason={response.choices[0].finish_reason}"
+                )
+                print(f"Option {option_id} attempt {attempt+1}: None content — {last_error}")
+                continue
 
-    except json.JSONDecodeError as e:
-        print(f"Option {option_id} JSON error: {str(e)}")
-        return {"success": False, "option_id": option_id, "error": str(e)}
+            content = message.content.strip()
 
-    except Exception as e:
-        print(f"Option {option_id} error: {str(e)}")
-        return {"success": False, "option_id": option_id, "error": str(e)}
+            if content.startswith("```"):
+                content = content.split("```")[1]
+                if content.startswith("json"):
+                    content = content[4:]
+            if content.endswith("```"):
+                content = content[:-3]
+
+            option = json.loads(content.strip())
+            return {"success": True, "option": option}
+
+        except json.JSONDecodeError as e:
+            last_error = str(e)
+            print(f"Option {option_id} attempt {attempt+1} JSON error: {last_error}")
+            continue
+
+        except Exception as e:
+            last_error = str(e)
+            print(f"Option {option_id} attempt {attempt+1} error: {last_error}")
+            continue
+
+    return {"success": False, "option_id": option_id, "error": last_error}
 
 
 def generate_market_context(
@@ -355,6 +273,48 @@ Return only a JSON object:
             "market_context": f"Current market conditions with 10-Year Treasury at {treasury_10y}% and CD rates at {cd_1y}% have influenced these recommendations.",
             "advisor_note": "The licensed financial advisor makes the final investment decision on all recommendations."
         }
+
+
+def build_rule_based_option(option_id, client_name, age, risk, horizon, amount):
+    """
+    NEW: Used only when an individual AI-generated option keeps failing
+    even after retries. Produces a rule-based allocation scaled to that
+    option's defined range (instead of one generic fallback for everything),
+    so the advisor still sees 4 distinct, correctly-tiered options.
+    """
+    opt = OPTION_DEFINITIONS[option_id]
+    ranges = opt["ranges"]
+
+    def midpoint(range_str):
+        parts = [float(p.strip()) for p in range_str.replace("to", "-").split("-")]
+        return sum(parts) / len(parts) if len(parts) > 1 else parts[0]
+
+    allocation = {
+        "equity_etfs":   midpoint(ranges["equity_etfs"]),
+        "growth_stocks": midpoint(ranges["growth_stocks"]),
+        "bond_etfs":     midpoint(ranges["bond_etfs"]),
+        "mutual_funds":  midpoint(ranges["mutual_funds"]),
+        "cds":           midpoint(ranges["cds"]),
+    }
+
+    return {
+        "id": option_id,
+        "name": opt["name"],
+        "tagline": opt["tagline"],
+        "recommended": opt["recommended"],
+        "allocation": allocation,
+        "instruments": {
+            "equity_etfs": [], "growth_stocks": [],
+            "bond_etfs": [], "mutual_funds": [], "cds": []
+        },
+        "reasoning": f"AI-generated detail unavailable for this option; a rule-based {opt['name'].lower()} allocation was applied instead. Review instrument selection manually before presenting to the client.",
+        "key_considerations": [
+            "This option used rule-based allocation, not AI-generated instrument selection",
+            "Manually select specific instruments before finalizing",
+            "Review allocation against client's full financial picture"
+        ],
+        "flags": ["ai_partial_fallback"]
+    }
 
 
 def generate_ai_recommendation(
@@ -405,9 +365,21 @@ def generate_ai_recommendation(
                     "advisor_note": "The licensed financial advisor makes the final investment decision."
                 }
 
+        # UPDATED: only fully fall back if EVERY option failed.
+        # If some (but not all) options failed even after retries,
+        # fill just those gaps with a rule-based option instead of
+        # discarding the AI-generated ones that did succeed.
+        if len(results) == 0:
+            print("All 4 options failed, using full fallback")
+            return {"success": False, "error": "No options generated"}
+
         if len(results) < 4:
-            print(f"Only got {len(results)} options, using fallback")
-            return {"success": False, "error": "Not all options generated"}
+            print(f"Only got {len(results)}/4 options — filling gaps with rule-based options")
+            missing = [oid for oid in option_ids if oid not in results]
+            for oid in missing:
+                results[oid] = build_rule_based_option(
+                    oid, client_name, age, risk, horizon, amount
+                )
 
         ordered_options = [results[oid] for oid in option_ids if oid in results]
 
