@@ -618,10 +618,16 @@ def portal():
             ai_result     = future_ai.result()
 
         if not ai_result["success"]:
-            ai_result   = get_fallback_recommendation(risk, age, horizon, amount)
+            ai_result   = get_fallback_recommendation(risk, age, horizon, amount, client_name)
             ai_fallback = True
+            from alerts import send_fallback_alert
+            send_fallback_alert(client_name, session.get("advisor", {}).get("email", "unknown"), "All 4 options failed AI generation")
         else:
             ai_fallback = ai_result.get("fallback", False)
+            if ai_result.get("partial_fallback_count", 0) > 0:
+                from alerts import send_fallback_alert
+                send_fallback_alert(client_name, session.get("advisor", {}).get("email", "unknown"),
+                    f"{ai_result['partial_fallback_count']} of 4 options fell back to rule-based allocation")
 
         ai_data    = ai_result["data"]
         ai_options = ai_data["options"]

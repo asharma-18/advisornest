@@ -77,7 +77,7 @@ def generate_single_option(
 ):
     """
     Generates one portfolio option via OpenAI.
-    UPDATED: now retries up to `max_retries` times, and instead of crashing
+    Retries up to `max_retries` times, and instead of crashing
     when the API returns no content (None), it logs the real reason
     (refusal text or finish_reason) and retries before giving up.
     """
@@ -277,10 +277,10 @@ Return only a JSON object:
 
 def build_rule_based_option(option_id, client_name, age, risk, horizon, amount):
     """
-    NEW: Used only when an individual AI-generated option keeps failing
-    even after retries. Produces a rule-based allocation scaled to that
-    option's defined range (instead of one generic fallback for everything),
-    so the advisor still sees 4 distinct, correctly-tiered options.
+    Used when an individual AI-generated option keeps failing even after
+    retries. Produces a rule-based allocation scaled to that option's
+    defined range, so the advisor still sees 4 distinct, correctly-tiered
+    options instead of one generic fallback.
     """
     opt = OPTION_DEFINITIONS[option_id]
     ranges = opt["ranges"]
@@ -313,7 +313,7 @@ def build_rule_based_option(option_id, client_name, age, risk, horizon, amount):
             "Manually select specific instruments before finalizing",
             "Review allocation against client's full financial picture"
         ],
-        "flags": ["ai_partial_fallback"]
+        "flags": ["Rule-based allocation — AI-generated detail was unavailable for this option"]
     }
 
 
@@ -365,7 +365,7 @@ def generate_ai_recommendation(
                     "advisor_note": "The licensed financial advisor makes the final investment decision."
                 }
 
-        # UPDATED: only fully fall back if EVERY option failed.
+        # Only fully fall back if EVERY option failed.
         # If some (but not all) options failed even after retries,
         # fill just those gaps with a rule-based option instead of
         # discarding the AI-generated ones that did succeed.
@@ -373,9 +373,11 @@ def generate_ai_recommendation(
             print("All 4 options failed, using full fallback")
             return {"success": False, "error": "No options generated"}
 
+        partial_fallback_count = 0
         if len(results) < 4:
             print(f"Only got {len(results)}/4 options — filling gaps with rule-based options")
             missing = [oid for oid in option_ids if oid not in results]
+            partial_fallback_count = len(missing)
             for oid in missing:
                 results[oid] = build_rule_based_option(
                     oid, client_name, age, risk, horizon, amount
@@ -386,6 +388,7 @@ def generate_ai_recommendation(
         return {
             "success": True,
             "fallback": False,
+            "partial_fallback_count": partial_fallback_count,
             "data": {
                 "options": ordered_options,
                 "market_context": context_data.get("market_context", ""),
@@ -398,45 +401,25 @@ def generate_ai_recommendation(
         return {"success": False, "error": str(e)}
 
 
-def get_fallback_recommendation(risk, age, horizon, amount):
-    from logic import calculate_allocation
-    allocation = calculate_allocation(risk, horizon, age)
+def get_fallback_recommendation(risk, age, horizon, amount, client_name="the client"):
+    """
+    Instead of one generic "AI unavailable" card, this builds all 4
+    rule-based options (same as build_rule_based_option), so even a
+    total AI failure looks like a normal set of tiered recommendations
+    to the advisor — not a visible outage.
+    """
+    options = [
+        build_rule_based_option(oid, client_name, age, risk, horizon, amount)
+        for oid in ["A", "B", "C", "D"]
+    ]
 
     return {
         "success": True,
         "fallback": True,
         "data": {
-            "options": [
-                {
-                    "id": "A",
-                    "name": "Standard Recommendation",
-                    "tagline": "Based on your client profile",
-                    "recommended": True,
-                    "allocation": {
-                        "equity_etfs":   allocation.get("stocks_lt", 30),
-                        "growth_stocks": allocation.get("stocks_st", 10),
-                        "bond_etfs":     allocation.get("bonds", 35),
-                        "mutual_funds":  allocation.get("mutual_funds", 15),
-                        "cds":           allocation.get("cds", 10)
-                    },
-                    "instruments": {
-                        "equity_etfs":   [],
-                        "growth_stocks": [],
-                        "bond_etfs":     [],
-                        "mutual_funds":  [],
-                        "cds":           []
-                    },
-                    "reasoning": "AI temporarily unavailable. Standard rule-based allocation applied.",
-                    "key_considerations": [
-                        "Review allocation with client",
-                        "Verify risk tolerance is current",
-                        "Consider current market conditions"
-                    ],
-                    "flags": []
-                }
-            ],
-            "market_context": "AI analysis temporarily unavailable.",
-            "advisor_note": "The advisor makes the final decision on all recommendations."
+            "options": options,
+            "market_context": "Standard rule-based allocation applied for this recommendation.",
+            "advisor_note": "The licensed advisor makes the final investment decision on all recommendations."
         }
     }
 
