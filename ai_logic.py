@@ -69,7 +69,41 @@ OPTION_DEFINITIONS = {
         "context": "This is the MOST AGGRESSIVE option. Maximum equity and growth stock exposure. Minimal fixed income. Option C is more conservative than this."
     }
 }
+def normalize_option_allocations(option, amount):
+    """
+    Forces each category's instrument allocation_pct values to sum
+    exactly to that category's declared allocation percentage —
+    regardless of what the AI actually returned. Fixes cases where
+    the AI leaves a gap (e.g. category says 15% but only lists one
+    instrument at 10%).
+    """
+    categories = ["equity_etfs", "growth_stocks", "bond_etfs", "mutual_funds", "cds"]
 
+    for cat in categories:
+        target_pct = option.get("allocation", {}).get(cat, 0)
+        instruments = option.get("instruments", {}).get(cat, [])
+
+        if not instruments or target_pct <= 0:
+            continue
+
+        current_sum = sum(inst.get("allocation_pct", 0) for inst in instruments)
+        if current_sum <= 0:
+            continue
+
+        scale = target_pct / current_sum
+        running_total = 0
+
+        for i, inst in enumerate(instruments):
+            if i == len(instruments) - 1:
+                new_pct = round(target_pct - running_total, 2)
+            else:
+                new_pct = round(inst["allocation_pct"] * scale, 2)
+                running_total += new_pct
+
+            inst["allocation_pct"] = max(new_pct, 0)
+            inst["dollar_amount"] = round((inst["allocation_pct"] / 100) * amount)
+
+    return option
 
 def generate_single_option(
     option_id, client_name, age, life_stage,
@@ -224,6 +258,7 @@ Return ONLY valid JSON. No markdown. No explanation."""
                 content = content[:-3]
 
             option = json.loads(content.strip())
+            option = normalize_option_allocations(option, amount)
             return {"success": True, "option": option}
 
         except json.JSONDecodeError as e:
