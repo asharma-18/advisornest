@@ -69,6 +69,35 @@ OPTION_DEFINITIONS = {
         "context": "This is the MOST AGGRESSIVE option. Maximum equity and growth stock exposure. Minimal fixed income. Option C is more conservative than this."
     }
 }
+
+def normalize_category_totals(option):
+    """
+    Forces the five category-level allocation percentages
+    (equity_etfs, growth_stocks, bond_etfs, mutual_funds, cds)
+    to sum exactly to 100 — regardless of what the AI actually
+    returned. Fixes cases like 40+30+10+10+0 = 90.
+    """
+    categories = ["equity_etfs", "growth_stocks", "bond_etfs", "mutual_funds", "cds"]
+    allocation = option.get("allocation", {})
+    current_total = sum(allocation.get(cat, 0) for cat in categories)
+
+    if current_total <= 0 or abs(current_total - 100) < 0.01:
+        return option
+
+    scale = 100 / current_total
+    running_total = 0
+
+    for i, cat in enumerate(categories):
+        if i == len(categories) - 1:
+            new_pct = round(100 - running_total, 2)
+        else:
+            new_pct = round(allocation.get(cat, 0) * scale, 2)
+            running_total += new_pct
+        allocation[cat] = max(new_pct, 0)
+
+    option["allocation"] = allocation
+    return option
+
 def normalize_option_allocations(option, amount):
     """
     Forces each category's instrument allocation_pct values to sum
@@ -258,6 +287,7 @@ Return ONLY valid JSON. No markdown. No explanation."""
                 content = content[:-3]
 
             option = json.loads(content.strip())
+            option = normalize_category_totals(option)
             option = normalize_option_allocations(option, amount)
             return {"success": True, "option": option}
 
