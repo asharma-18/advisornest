@@ -698,6 +698,41 @@ def portal():
         result=result,
         form_data=form_data)
 
+@main.route("/feedback")
+def feedback_page():
+    if not session.get("logged_in"):
+        flash("Please log in to continue.", "info")
+        return redirect(url_for("main.login"))
+    return render_template("portal/feedback.html", advisor=session.get("advisor"))
+
+@main.route("/feedback/pricing", methods=["POST"])
+def feedback_pricing():
+    if not session.get("logged_in"):
+        return redirect(url_for("main.login"))
+
+    from auth import get_supabase
+
+    respondent_name = request.form.get("respondent_name", "").strip()
+    usefulness      = request.form.get("usefulness", "").strip()
+    would_pay_band  = request.form.get("would_pay_band", "").strip()
+    vs_current      = request.form.get("vs_current", "").strip()
+    comment         = request.form.get("comment", "").strip()
+
+    try:
+        get_supabase().table("feedback_survey").insert({
+            "advisor_email":   session.get("advisor", {}).get("email", "unknown"),
+            "respondent_name": respondent_name,
+            "usefulness":      usefulness,
+            "would_pay_band":  would_pay_band,
+            "vs_current":      vs_current,
+            "comment":         comment
+        }).execute()
+        flash("Thanks for the feedback!", "success")
+    except Exception as e:
+        print(f"Failed to save feedback: {str(e)}")
+        flash("Couldn't save feedback right now — thanks anyway!", "info")
+
+    return redirect(url_for("main.dashboard"))
 
 # ── Save Client ───────────────────────────────────────────
 @main.route("/save-client", methods=["POST"])

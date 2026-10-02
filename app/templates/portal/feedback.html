@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}Feedback — AdvisorNest{% endblock %}
+
+{% block page_title %}
+    Feedback
+{% endblock %}
+
+{% block page_subtitle %}
+    Quick 4-question survey — help us build the right thing
+{% endblock %}
+
+{% block page_content %}
+
+<div style="background:white;border:1px solid var(--border);border-radius:10px;padding:28px 32px;max-width:640px;">
+
+    <form method="POST" action="{{ url_for('main.feedback_pricing') }}">
+        <div style="font-size:0.8rem;font-weight:700;color:var(--text-primary);margin-bottom:8px;">1. How useful has AdvisorNest been so far?</div>
+        <div style="display:flex;gap:10px;margin-bottom:22px;">
+            <label style="flex:1;text-align:center;padding:10px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;font-size:0.825rem;font-weight:600;">
+                <input type="radio" name="usefulness" value="not" required style="margin-right:6px;">Not useful
+            </label>
+            <label style="flex:1;text-align:center;padding:10px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;font-size:0.825rem;font-weight:600;">
+                <input type="radio" name="usefulness" value="somewhat" style="margin-right:6px;">Somewhat
+            </label>
+            <label style="flex:1;text-align:center;padding:10px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;font-size:0.825rem;font-weight:600;">
+                <input type="radio" name="usefulness" value="very" style="margin-right:6px;">Very useful
+            </label>
+        </div>
+
+        <div style="font-size:0.8rem;font-weight:700;color:var(--text-primary);margin-bottom:8px;">2. How much would you pay per month for this tool?</div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:22px;">
+            <label style="flex:1;min-width:100px;text-align:center;padding:10px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">
+                <input type="radio" name="would_pay_band" value="under50" required style="margin-right:6px;">Under $50
+            </label>
+            <label style="flex:1;min-width:100px;text-align:center;padding:10px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">
+                <input type="radio" name="would_pay_band" value="50to100" style="margin-right:6px;">$50–100
+            </label>
+            <label style="flex:1;min-width:100px;text-align:center;padding:10px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">
+                <input type="radio" name="would_pay_band" value="100to200" style="margin-right:6px;">$100–200
+            </label>
+            <label style="flex:1;min-width:100px;text-align:center;padding:10px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">
+                <input type="radio" name="would_pay_band" value="200plus" style="margin-right:6px;">$200+
+            </label>
+            <label style="flex:1;min-width:100px;text-align:center;padding:10px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">
+                <input type="radio" name="would_pay_band" value="none" style="margin-right:6px;">Wouldn't pay
+            </label>
+        </div>
+
+        <div style="font-size:0.8rem;font-weight:700;color:var(--text-primary);margin-bottom:8px;">3. How does this compare to what you use today?</div>
+        <div style="display:flex;gap:10px;margin-bottom:22px;">
+            <label style="flex:1;text-align:center;padding:10px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">
+                <input type="radio" name="vs_current" value="better" style="margin-right:6px;">Better than my current process
+            </label>
+            <label style="flex:1;text-align:center;padding:10px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">
+                <input type="radio" name="vs_current" value="same" style="margin-right:6px;">About the same
+            </label>
+            <label style="flex:1;text-align:center;padding:10px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">
+                <input type="radio" name="vs_current" value="no_process" style="margin-right:6px;">No process for this
+            </label>
+        </div>
+
+        <label style="display:block;font-size:0.8rem;font-weight:700;color:var(--text-primary);margin-bottom:8px;">4. What would make you more likely to use this weekly? <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
+        <input type="text" name="comment" placeholder="e.g. faster load time, more asset classes..." style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:0.85rem;margin-bottom:22px;">
+
+        <label style="display:block;font-size:0.75rem;font-weight:600;color:var(--text-muted);margin-bottom:8px;">Your name <span style="font-weight:400;">(optional)</span></label>
+        <input type="text" name="respondent_name" placeholder="So we know who to thank" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:0.85rem;margin-bottom:24px;">
+
+        <button type="submit" style="padding:10px 24px;background:var(--navy);color:white;border:none;border-radius:8px;font-size:0.85rem;font-weight:700;cursor:pointer;">Submit Feedback</button>
+    </form>
+</div>
+
+{% endblock %}

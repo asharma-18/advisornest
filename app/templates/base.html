@@ -57,6 +57,11 @@
                 <span class="sidebar-nav-icon">📝</span>
                 <span class="sidebar-nav-label">Meeting Notes</span>
             </a>
+            <a href="{{ url_for('main.feedback_page') }}"
+               class="sidebar-nav-item {% if request.endpoint == 'main.feedback_page' %}active{% endif %}">
+                <span class="sidebar-nav-icon">💬</span>
+                <span class="sidebar-nav-label">Feedback</span>
+            </a>
             <a href="{{ url_for('main.settings') }}"
                class="sidebar-nav-item {% if request.endpoint == 'main.settings' %}active{% endif %}">
                 <span class="sidebar-nav-icon">⚙️</span>
