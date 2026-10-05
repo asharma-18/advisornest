@@ -884,10 +884,11 @@
             </div>
             <div class="stat-card">
                 <div class="stat-label">Portfolio Score</div>
-                <div class="stat-value text-{{ result.score_color }}">
+                <div class="stat-value text-{{ result.score_color }}"
+                     id="portfolio-score-value">
                     {{ result.score }}/100
                 </div>
-                <div class="stat-sub">{{ result.score_label }}</div>
+                <div class="stat-sub" id="portfolio-score-sub">{{ result.score_label }}</div>
             </div>
         </div>
 
@@ -1536,6 +1537,25 @@ function selectOption(optionId) {
     const detail = document.getElementById('detail-' + optionId);
     if (detail) detail.style.display = 'block';
 
+    // Update the Portfolio Score stat tile to reflect THIS option
+    if (window.AI_OPTIONS) {
+        const option = window.AI_OPTIONS.find(function(o) {
+            return o.id === optionId;
+        });
+        if (option && typeof option.score !== 'undefined') {
+            const scoreEl = document.getElementById('portfolio-score-value');
+            const subEl   = document.getElementById('portfolio-score-sub');
+            if (scoreEl) {
+                scoreEl.textContent = option.score + '/100';
+                scoreEl.className = 'stat-value text-' + option.score_color;
+            }
+            if (subEl) subEl.textContent = option.score_label;
+
+            const saveScoreEl = document.getElementById('save-score');
+            if (saveScoreEl) saveScoreEl.value = option.score;
+        }
+    }
+
     // Generate suitability note for selected option
     generateSuitabilityNote(optionId);
 }
@@ -1895,6 +1915,14 @@ function saveClient(optionId, optionName, useCustom) {
     document.getElementById('save-selected_option').value =
         optionId + ' - ' + optionName +
         (useCustom ? ' (Advisor Customized)' : '');
+
+    if (window.AI_OPTIONS) {
+        const opt = window.AI_OPTIONS.find(function(o) { return o.id === optionId; });
+        if (opt && typeof opt.score !== 'undefined') {
+            const saveScoreEl = document.getElementById('save-score');
+            if (saveScoreEl) saveScoreEl.value = opt.score;
+        }
+    }
 
     // Get the current suitability note from the display element
     const noteEl = document.getElementById('suitability-note-' + optionId);

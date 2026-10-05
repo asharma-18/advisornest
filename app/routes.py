@@ -632,37 +632,30 @@ def portal():
         ai_data    = ai_result["data"]
         ai_options = ai_data["options"]
 
-        allocation = calculate_allocation(risk, horizon, age)
-        score      = portfolio_score(risk, horizon, age)
-        flags      = get_advisor_flags(risk, horizon, age)
+        # Score each option against ITS OWN allocation, not just the
+        # recommended one — otherwise every option card shows the same score.
+        for opt in ai_options:
+            opt_alloc = {
+                "equity_etfs":   opt.get("allocation", {}).get("equity_etfs", 30),
+                "growth_stocks": opt.get("allocation", {}).get("growth_stocks", 10),
+                "bond_etfs":     opt.get("allocation", {}).get("bond_etfs", 35),
+                "mutual_funds":  opt.get("allocation", {}).get("mutual_funds", 15),
+                "cds":           opt.get("allocation", {}).get("cds", 10),
+            }
+            opt_score = portfolio_score(risk, horizon, age, opt_alloc)
+            opt["score"] = opt_score
+            if opt_score >= 80:
+                opt["score_color"], opt["score_label"] = "success", "Excellent"
+            elif opt_score >= 60:
+                opt["score_color"], opt["score_label"] = "warning", "Moderate"
+            else:
+                opt["score_color"], opt["score_label"] = "error", "Needs Review"
 
-        recommended_option = next(
+        recommended = next(
             (o for o in ai_options if o.get("recommended")),
             ai_options[0] if ai_options else None
         )
 
-        if recommended_option and recommended_option.get("suitability_note"):
-            suitability_note = recommended_option["suitability_note"]
-        else:
-            suitability_note = generate_suitability_note(
-                client_name, age, life_stage,
-                risk, horizon, amount, allocation
-            )
-
-        if score >= 80:
-            score_color = "success"
-            score_label = "Excellent"
-        elif score >= 60:
-            score_color = "warning"
-            score_label = "Moderate"
-        else:
-            score_color = "error"
-            score_label = "Needs Review"
-
-        recommended = next(
-            (o for o in ai_options if o.get("recommended")),
-            ai_options[0]
-        )
         allocation = {
             "equity_etfs":   recommended["allocation"].get("equity_etfs", 30),
             "growth_stocks": recommended["allocation"].get("growth_stocks", 10),
@@ -670,6 +663,22 @@ def portal():
             "mutual_funds":  recommended["allocation"].get("mutual_funds", 15),
             "cds":           recommended["allocation"].get("cds", 10),
         }
+
+        # Reuse what was already computed for the recommended option above —
+        # don't recompute it a second time.
+        score       = recommended["score"]
+        score_color = recommended["score_color"]
+        score_label = recommended["score_label"]
+
+        flags = get_advisor_flags(risk, horizon, age)
+
+        if recommended.get("suitability_note"):
+            suitability_note = recommended["suitability_note"]
+        else:
+            suitability_note = generate_suitability_note(
+                client_name, age, life_stage,
+                risk, horizon, amount, allocation
+            )
 
         result = {
             "client_name":      client_name,
@@ -878,7 +887,7 @@ def save_edited_client(client_id):
         instruments = json.loads(request.form.get("instruments", "{}"))
         suitability_note = request.form.get("suitability_note", "")
 
-        score = portfolio_score(client["risk"], client["horizon"], client["age"])
+        score = portfolio_score(client["risk"], client["horizon"], client["age"], allocation)
         flags = get_advisor_flags(client["risk"], client["horizon"], client["age"])
 
         result = update_client(client_id, advisor_id, {
@@ -1283,8 +1292,8 @@ def market_watch_data():
 
             return json.dumps({"success": True, "prices": results})
 
-       
-     # ── Search by ticker or name ──────────────────────
+
+        # ── Search by ticker or name ──────────────────────
         elif data_type == "search":
             query = data.get("ticker", "").strip()
             try:
@@ -1339,7 +1348,7 @@ def market_watch_data():
             except Exception as e:
                 return json.dumps({"success": False, "error": str(e)})
 
-         # ── Top Gainers ───────────────────────────────────
+        # ── Top Gainers ───────────────────────────────────
         elif data_type == "gainers":
             try:
                 import requests as req
@@ -1417,8 +1426,8 @@ def market_watch_data():
                 results.sort(key=lambda x: x["change_pct"], reverse=True)
 
                 return json.dumps({"success": True, "gainers": results})
-            
-         # ── News ─────────────────────────────────────────
+
+        # ── News ─────────────────────────────────────────
         elif data_type == "news":
             import feedparser
             feeds = [
@@ -1591,7 +1600,7 @@ def refresh_all_drift_caches():
     except Exception as e:
         print(f"[BACKGROUND] Drift refresh error: {str(e)}")
 
-    
+
 # ── Portfolio Review (list) ────────────────────────────────
 @main.route("/portfolio-review")
 def portfolio_review():
@@ -1699,7 +1708,7 @@ def portfolio_review_detail_data(client_id):
 
     except Exception as e:
         print(f"Portfolio review detail error: {str(e)}")
-        return json.dumps({"success": False})                
+        return json.dumps({"success": False})
 # ── Meeting Prep ──────────────────────────────────────────
 @main.route("/clients/<client_id>/meeting-prep")
 def meeting_prep(client_id):

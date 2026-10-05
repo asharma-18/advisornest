@@ -46,26 +46,36 @@ def calculate_allocation(risk, horizon, age):
 
 
 # ── Portfolio Score ───────────────────────────────────────
-def portfolio_score(risk, horizon, age):
+def portfolio_score(risk, horizon, age, allocation):
     """
-    Scores how well-balanced a portfolio is for this
-    specific client profile. Returns a number 0-100.
+    Scores how closely the given portfolio allocation matches
+    the expected allocation for this client's risk tolerance,
+    time horizon, and age. Returns a number 0-100.
     """
-    score = 60
+    expected = calculate_allocation(risk, horizon, age)
 
-    # Reward appropriate time horizons
-    if 5 <= horizon <= 20:
-        score += 15
+    expected_stocks = expected["Stocks (Long Term)"] + expected["Stocks (Short Term)"]
+    expected_bonds  = expected["Bonds"]
+    expected_mf     = expected["Mutual Funds"]
+    expected_cds    = expected["CDs"]
 
-    # Reward working-age clients
-    if 28 <= age <= 62:
-        score += 15
+    actual_stocks = allocation.get("equity_etfs", 0) + allocation.get("growth_stocks", 0)
+    actual_bonds  = allocation.get("bond_etfs", 0)
+    actual_mf     = allocation.get("mutual_funds", 0)
+    actual_cds    = allocation.get("cds", 0)
 
-    # Reward balanced risk
-    if risk.lower() == "medium":
-        score += 10
+    deviation = (
+        abs(actual_stocks - expected_stocks) +
+        abs(actual_bonds  - expected_bonds)  +
+        abs(actual_mf     - expected_mf)     +
+        abs(actual_cds    - expected_cds)
+    )
 
-    return min(score, 100)
+    # Both allocations sum to 100, so total deviation maxes out
+    # around 200 (completely opposite). Convert to a 0-100 score.
+    score = 100 - (deviation / 2)
+
+    return max(0, min(round(score), 100))
 
 
 # ── Advisor Flags ─────────────────────────────────────────

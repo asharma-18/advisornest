@@ -3,6 +3,7 @@ import json
 from openai import OpenAI
 from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from logic import calculate_allocation
 
 load_dotenv()
 
@@ -14,61 +15,110 @@ def get_client():
         _client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     return _client
 
-# ── Option Definitions ────────────────────────────────────
-OPTION_DEFINITIONS = {
+# ── Option Metadata (fixed) ───────────────────────────────
+# Only the descriptive bits + how far each tier shifts away from
+# the client's own ideal allocation. The actual percentage RANGES
+# are computed per-client in get_option_definitions() below.
+OPTION_META = {
     "A": {
         "name": "Capital Preservation",
         "tagline": "Safety and income above all else",
-        "recommended": False,
-        "ranges": {
-            "equity_etfs":   "5 to 15",
-            "growth_stocks": "0",
-            "bond_etfs":     "40 to 55",
-            "mutual_funds":  "20 to 30",
-            "cds":           "15 to 25"
-        },
+        "shift": -32,
+        "growth_share": 0.0,
         "context": "This is the MOST CONSERVATIVE option. Focus on capital preservation, income, and safety. Minimal equity exposure. Heavy fixed income and CDs."
     },
     "B": {
         "name": "Conservative Growth",
         "tagline": "Stability with modest appreciation",
-        "recommended": False,
-        "ranges": {
-            "equity_etfs":   "20 to 30",
-            "growth_stocks": "0 to 8",
-            "bond_etfs":     "30 to 40",
-            "mutual_funds":  "15 to 25",
-            "cds":           "10 to 20"
-        },
+        "shift": -14,
+        "growth_share": 0.15,
         "context": "This is the SECOND most conservative option. Slightly more equity than Option A but still bond-heavy. Option A is more conservative than this. Option C is more aggressive than this."
     },
     "C": {
         "name": "Balanced Growth",
         "tagline": "Optimal risk-adjusted returns",
-        "recommended": True,
-        "ranges": {
-            "equity_etfs":   "30 to 40",
-            "growth_stocks": "10 to 20",
-            "bond_etfs":     "20 to 30",
-            "mutual_funds":  "10 to 20",
-            "cds":           "5 to 15"
-        },
+        "shift": 0,
+        "growth_share": 0.30,
         "context": "This is the BALANCED option and the AI recommended choice. Equal weight between growth and stability. Option B is more conservative than this. Option D is more aggressive than this."
     },
     "D": {
         "name": "Aggressive Growth",
         "tagline": "Maximum long-term growth potential",
-        "recommended": False,
-        "ranges": {
-            "equity_etfs":   "35 to 50",
-            "growth_stocks": "25 to 40",
-            "bond_etfs":     "5 to 15",
-            "mutual_funds":  "5 to 15",
-            "cds":           "0 to 8"
-        },
+        "shift": 28,
+        "growth_share": 0.45,
         "context": "This is the MOST AGGRESSIVE option. Maximum equity and growth stock exposure. Minimal fixed income. Option C is more conservative than this."
     }
 }
+
+BAND_WIDTH = 7  # total width (percentage points) of each option's range
+
+
+def get_option_definitions(risk, horizon, age):
+    """
+    Builds the 4 option tiers (A/B/C/D) CENTERED ON THIS SPECIFIC
+    CLIENT's own ideal allocation (from calculate_allocation), instead
+    of using the same fixed percentages for every client.
+
+    Option C (shift=0) always sits on the client's own ideal, so it is
+    the one that scores highest against portfolio_score() by construction
+    — which is why it keeps the "recommended" flag. A/B tilt toward
+    safety, D tilts toward growth, relative to THIS client's baseline.
+    """
+    ideal = calculate_allocation(risk, horizon, age)
+    ideal_stocks = ideal["Stocks (Long Term)"] + ideal["Stocks (Short Term)"]
+    ideal_bonds  = ideal["Bonds"]
+    ideal_mf     = ideal["Mutual Funds"]
+    ideal_cds    = ideal["CDs"]
+
+    half = BAND_WIDTH // 2
+
+    def band(center):
+        center = round(center)
+        lo = max(0, center - half)
+        hi = center + half
+        return f"{lo} to {hi}"
+
+    definitions = {}
+
+    for option_id, meta in OPTION_META.items():
+        shift = meta["shift"]
+
+        # Shift equity exposure up/down from THIS client's own ideal.
+        # The offsetting amount comes out of (or back into) bonds.
+        stocks_total = max(0, min(100, ideal_stocks + shift))
+        bonds        = max(0, ideal_bonds - shift)
+
+        # Rescale so the five categories still sum to 100 after the shift.
+        raw_total = stocks_total + bonds + ideal_mf + ideal_cds
+        scale = 100 / raw_total if raw_total else 1
+
+        stocks_total = stocks_total * scale
+        bonds        = bonds * scale
+        mf           = ideal_mf * scale
+        cds          = ideal_cds * scale
+
+        # Split the stock bucket into ETFs (core) vs individual growth
+        # stocks (satellite) — more aggressive tiers lean more on
+        # individual growth stocks.
+        growth_stocks = stocks_total * meta["growth_share"]
+        equity_etfs   = stocks_total - growth_stocks
+
+        definitions[option_id] = {
+            "name":        meta["name"],
+            "tagline":     meta["tagline"],
+            "recommended": option_id == "C",
+            "ranges": {
+                "equity_etfs":   band(equity_etfs),
+                "growth_stocks": band(growth_stocks),
+                "bond_etfs":     band(bonds),
+                "mutual_funds":  band(mf),
+                "cds":           band(cds),
+            },
+            "context": meta["context"]
+        }
+
+    return definitions
+
 
 def normalize_category_totals(option):
     """
@@ -136,7 +186,7 @@ def normalize_option_allocations(option, amount):
 
 def generate_single_option(
     option_id, client_name, age, life_stage,
-    risk, horizon, amount, market_data, max_retries=2
+    risk, horizon, amount, market_data, option_definitions, max_retries=2
 ):
     """
     Generates one portfolio option via OpenAI.
@@ -149,7 +199,7 @@ def generate_single_option(
     treasury_1y  = rates.get("1_year_treasury", "N/A")
     cd_1y        = rates.get("cd_1_year", "N/A")
 
-    opt = OPTION_DEFINITIONS[option_id]
+    opt = option_definitions[option_id]
     ranges = opt["ranges"]
 
     prompt = f"""You are a senior portfolio analyst providing DECISION SUPPORT to licensed financial advisors.
@@ -205,6 +255,7 @@ RULES:
 - Example: if equity_etfs = 35%, then all equity_etf instruments must sum to exactly 35%
 - Use multiple instruments per category to fill the full allocation
 - Never leave allocation gaps — every percentage point must be assigned to an instrument
+- Keep each instrument's "reasoning" field to one short phrase (under 12 words), not a full sentence
 
 Return ONLY this exact JSON structure:
 {{
@@ -234,11 +285,10 @@ Return ONLY this exact JSON structure:
       {{"ticker": "CD-1Y", "name": "1-Year Certificate of Deposit", "allocation_pct": 10, "dollar_amount": 0, "reasoning": "specific reason for this client", "conviction": "High", "hold_period": "1 Year"}}
     ]
   }},
-  "reasoning": "Write 2-3 specific paragraphs explaining why this exact allocation suits {client_name} aged {age} with {risk} risk tolerance and {horizon} year horizon. Reference current market conditions including 10Y Treasury at {treasury_10y}%.",
+  "reasoning": "Write 1 concise paragraph (3-4 sentences) explaining why this exact allocation suits {client_name} aged {age} with {risk} risk tolerance and {horizon} year horizon. Reference current market conditions including 10Y Treasury at {treasury_10y}%.",
   "key_considerations": [
     "Specific consideration 1 tailored to this client and option",
-    "Specific consideration 2",
-    "Specific consideration 3"
+    "Specific consideration 2"
   ],
   "flags": []
 }}
@@ -263,8 +313,9 @@ Return ONLY valid JSON. No markdown. No explanation."""
                         "content": prompt
                     }
                 ],
-                max_tokens=1200,
-                temperature=0.2
+                max_tokens=1000,
+                temperature=0.2,
+                response_format={"type": "json_object"}
             )
 
             message = response.choices[0].message
@@ -340,14 +391,14 @@ Return only a JSON object:
         }
 
 
-def build_rule_based_option(option_id, client_name, age, risk, horizon, amount):
+def build_rule_based_option(option_id, client_name, age, risk, horizon, amount, option_definitions):
     """
     Used when an individual AI-generated option keeps failing even after
     retries. Produces a rule-based allocation scaled to that option's
     defined range, so the advisor still sees 4 distinct, correctly-tiered
     options instead of one generic fallback.
     """
-    opt = OPTION_DEFINITIONS[option_id]
+    opt = option_definitions[option_id]
     ranges = opt["ranges"]
 
     def midpoint(range_str):
@@ -390,6 +441,7 @@ def generate_ai_recommendation(
     treasury_10y = rates.get("10_year_treasury", "N/A")
     cd_1y        = rates.get("cd_1_year", "N/A")
 
+    option_definitions = get_option_definitions(risk, horizon, age)
     option_ids = ["A", "B", "C", "D"]
     results = {}
 
@@ -401,7 +453,7 @@ def generate_ai_recommendation(
                     generate_single_option,
                     option_id,
                     client_name, age, life_stage,
-                    risk, horizon, amount, market_data
+                    risk, horizon, amount, market_data, option_definitions
                 ): option_id
                 for option_id in option_ids
             }
@@ -445,7 +497,7 @@ def generate_ai_recommendation(
             partial_fallback_count = len(missing)
             for oid in missing:
                 results[oid] = build_rule_based_option(
-                    oid, client_name, age, risk, horizon, amount
+                    oid, client_name, age, risk, horizon, amount, option_definitions
                 )
 
         ordered_options = [results[oid] for oid in option_ids if oid in results]
@@ -473,8 +525,9 @@ def get_fallback_recommendation(risk, age, horizon, amount, client_name="the cli
     total AI failure looks like a normal set of tiered recommendations
     to the advisor — not a visible outage.
     """
+    option_definitions = get_option_definitions(risk, horizon, age)
     options = [
-        build_rule_based_option(oid, client_name, age, risk, horizon, amount)
+        build_rule_based_option(oid, client_name, age, risk, horizon, amount, option_definitions)
         for oid in ["A", "B", "C", "D"]
     ]
 
