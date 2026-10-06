@@ -47,7 +47,7 @@
                 <th>Investment</th>
                 <th>Risk</th>
                 <th>Horizon</th>
-                <th>Score</th>
+                <th>Model Deviation</th>
                 <th>Saved</th>
                 <th>Actions</th>
             </tr>
@@ -74,11 +74,8 @@
                 </td>
                 <td>{{ client.horizon }} yrs</td>
                 <td>
-                    <span style="font-weight:600;
-                        color:{% if client.score >= 80 %}var(--success)
-                        {% elif client.score >= 60 %}var(--warning)
-                        {% else %}var(--error){% endif %}">
-                        {{ client.score }}/100
+                    <span style="font-weight:600;color:var(--text-primary)">
+                        {{ 100 - client.score }} pts
                     </span>
                 </td>
                 <td style="color:var(--text-muted);font-size:0.8rem">

@@ -349,11 +349,8 @@
                 <span class="info-value">{{ rec.horizon }} years</span>
             </div>
             <div class="info-row">
-                <span class="info-label">Score</span>
-                <span class="info-value"
-                      style="color:var(--success)">
-                    {{ rec.score }}/100
-                </span>
+                <span class="info-label">Deviation from Model Mix</span>
+                <span class="info-value">{{ 100 - rec.score }} pts</span>
             </div>
         </div>
 

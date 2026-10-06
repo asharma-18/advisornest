@@ -429,12 +429,9 @@
             </div>
         </div>
         <div class="briefing-stat-primary">
-            <div class="briefing-stat-primary-label">Portfolio Score</div>
-            <div class="briefing-stat-primary-value
-                {% if client.score >= 80 %}green
-                {% elif client.score >= 60 %}gold
-                {% else %}red{% endif %}">
-                {{ client.score }}/100
+            <div class="briefing-stat-primary-label">Model Deviation</div>
+            <div class="briefing-stat-primary-value">
+                {{ 100 - client.score }} pts
             </div>
         </div>
         <div class="briefing-stat-primary">
@@ -951,7 +948,6 @@ function generateTalkingPoints() {
             risk:        {{ client.risk | tojson }},
             horizon:     {{ client.horizon }},
             amount:      {{ client.amount }},
-            score:       {{ client.score }},
             last_note:   {{ notes[0].body[:200] | tojson if notes else '""' | safe }}
         })
     })

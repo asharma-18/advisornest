@@ -22,10 +22,20 @@ WHITE    = white
 
 
 def safe(value, default=""):
-    """Return value if not None, otherwise return default."""
+    """Return value as text, or the default if it is None or blank."""
     if value is None:
         return default
-    return str(value)
+    text = str(value)
+    return text if text.strip() else default
+
+
+def fmt_pct(value):
+    """35.0 -> '35', 33.333 -> '33.33'"""
+    try:
+        v = round(float(value), 2)
+    except (TypeError, ValueError):
+        return "0"
+    return f"{v:g}"
 
 
 def generate_pdf_report(client, advisor):
@@ -37,6 +47,7 @@ def generate_pdf_report(client, advisor):
     )
     W = 6.9 * inch
     content = []
+    amount = client.get("amount") or 0
 
     s_body = ParagraphStyle("Body", fontSize=9, textColor=TEXT,
         fontName="Times-Roman", leading=15, spaceAfter=2, alignment=TA_JUSTIFY)
@@ -48,6 +59,26 @@ def generate_pdf_report(client, advisor):
         fontName="Helvetica-Bold")
     s_disclaimer = ParagraphStyle("Disclaimer", fontSize=7, textColor=MUTED,
         fontName="Helvetica", leading=10, alignment=TA_CENTER)
+
+    # Disclosure is drawn in the page margin on every page, so it can
+    # never spill onto a page of its own.
+    disclosure_text = (
+        "IMPORTANT DISCLOSURE: This report was prepared using AdvisorNest "
+        "decision support software for licensed financial advisors only. "
+        "All recommendations require advisor review and client suitability "
+        "assessment before implementation. This document does not constitute "
+        "financial advice."
+    )
+
+    def draw_footer(canvas, doc_):
+        canvas.saveState()
+        canvas.setStrokeColor(GOLD)
+        canvas.setLineWidth(1)
+        canvas.line(doc_.leftMargin, 0.62*inch, doc_.leftMargin + W, 0.62*inch)
+        p = Paragraph(escape(disclosure_text), s_disclaimer)
+        _, h = p.wrap(W, 0.5*inch)
+        p.drawOn(canvas, doc_.leftMargin, 0.55*inch - h)
+        canvas.restoreState()
 
     # ── 1. Header ─────────────────────────────────────────
     header = Table(
@@ -134,16 +165,16 @@ def generate_pdf_report(client, advisor):
          Paragraph(f"${client['amount']:,}" if client.get("amount") else "N/A", s_bold),
          Paragraph("Time Horizon", s_label),
          Paragraph(f"{client.get('horizon', 'N/A')} years", s_body)],
-        [Paragraph("Portfolio Score", s_label),
-         Paragraph(f"{client.get('score', 'N/A')}/100", s_bold),
-         Paragraph("Report Date", s_label),
-         Paragraph(datetime.now().strftime("%B %d, %Y"), s_body)],
+        [Paragraph("Report Date", s_label),
+         Paragraph(datetime.now().strftime("%B %d, %Y"), s_body),
+         "", ""],
     ]
     pt = Table(profile,
         colWidths=[1.4*inch, 2.1*inch, 1.4*inch, 2.0*inch])
     pt.setStyle(TableStyle([
         ("BACKGROUND", (0,0), (0,-1), LIGHT_BG),
-        ("BACKGROUND", (2,0), (2,-1), LIGHT_BG),
+        ("BACKGROUND", (2,0), (2,2),  LIGHT_BG),
+        ("SPAN",       (1,3), (3,3)),
         ("GRID",       (0,0), (-1,-1), 0.5, BORDER),
         ("PADDING",    (0,0), (-1,-1), 8),
         ("VALIGN",     (0,0), (-1,-1), "TOP"),
@@ -152,15 +183,44 @@ def generate_pdf_report(client, advisor):
     content.append(Spacer(1, 14))
 
     # ── 4. Portfolio Allocation ────────────────────────────
-    content.append(section_bar("PORTFOLIO ALLOCATION"))
-    content.append(Spacer(1, 6))
-
     allocation = client.get("allocation", {})
     if isinstance(allocation, str):
         try:
             allocation = json.loads(allocation)
         except Exception:
             allocation = {}
+    allocation = allocation or {}
+
+    # The instrument list drives the allocation table, so the two
+    # sections of this report can never disagree.
+    rec_data = client.get("recommendation_data", {}) or {}
+    if isinstance(rec_data, str):
+        try:
+            rec_data = json.loads(rec_data)
+        except Exception:
+            rec_data = {}
+    instruments = rec_data.get("instruments", {}) or {}
+
+    def active_instruments(cat_key):
+        return [i for i in (instruments.get(cat_key) or [])
+                if (i.get("allocation_pct") or 0) > 0]
+
+    cat_order = ["equity_etfs", "growth_stocks", "bond_etfs",
+                 "mutual_funds", "cds"]
+    category_pcts = {}
+    for key in cat_order:
+        items = active_instruments(key)
+        if items:
+            category_pcts[key] = round(
+                sum(float(i.get("allocation_pct") or 0) for i in items), 2)
+        else:
+            category_pcts[key] = float(allocation.get(key, 0) or 0)
+    for key, pct in allocation.items():      # older records with other keys
+        if key not in category_pcts:
+            category_pcts[key] = float(pct or 0)
+
+    content.append(section_bar("PORTFOLIO ALLOCATION"))
+    content.append(Spacer(1, 6))
 
     cat_labels = {
         "equity_etfs":   "Equity ETFs",
@@ -197,14 +257,14 @@ def generate_pdf_report(client, advisor):
             textColor=WHITE, fontName="Helvetica-Bold")),
     ]]
 
-    for key, pct in allocation.items():
+    for key, pct in category_pcts.items():
         if pct and pct > 0:
-            dollar = round((pct / 100) * client["amount"])
+            dollar = round((pct / 100) * amount)
             label = cat_labels.get(key, key.replace("_", " ").title())
             note  = notes_map.get(key, "")
             alloc_data.append([
                 Paragraph(label, s_bold),
-                Paragraph(f"{pct}%", ParagraphStyle("AP", fontSize=9,
+                Paragraph(f"{fmt_pct(pct)}%", ParagraphStyle("AP", fontSize=9,
                     textColor=NAVY, fontName="Helvetica-Bold",
                     alignment=TA_CENTER)),
                 Paragraph(f"${dollar:,}", ParagraphStyle("AR", fontSize=9,
@@ -213,13 +273,16 @@ def generate_pdf_report(client, advisor):
                 Paragraph(note, s_label),
             ])
 
+    # The total is calculated from the rows above, not hard-coded.
+    total_pct    = round(sum(category_pcts.values()), 2)
+    total_dollar = round((total_pct / 100) * amount)
     alloc_data.append([
         Paragraph("TOTAL", ParagraphStyle("AT1", fontSize=9,
             textColor=NAVY, fontName="Helvetica-Bold")),
-        Paragraph("100%", ParagraphStyle("AT2", fontSize=9,
+        Paragraph(f"{fmt_pct(total_pct)}%", ParagraphStyle("AT2", fontSize=9,
             textColor=NAVY, fontName="Helvetica-Bold",
             alignment=TA_CENTER)),
-        Paragraph(f"${client['amount']:,}", ParagraphStyle("AT3",
+        Paragraph(f"${total_dollar:,}", ParagraphStyle("AT3",
             fontSize=9, textColor=NAVY, fontName="Helvetica-Bold",
             alignment=TA_RIGHT)),
         Paragraph("", s_body),
@@ -240,16 +303,7 @@ def generate_pdf_report(client, advisor):
     content.append(Spacer(1, 14))
 
     # ── 5. Recommended Instruments ─────────────────────────
-    rec_data = client.get("recommendation_data", {}) or {}
-    if isinstance(rec_data, str):
-        try:
-            rec_data = json.loads(rec_data)
-        except Exception:
-            rec_data = {}
-
-    instruments = rec_data.get("instruments", {})
-
-    if instruments:
+    if any(active_instruments(k) for k in cat_order):
         content.append(section_bar("RECOMMENDED INSTRUMENTS"))
         content.append(Spacer(1, 6))
 
@@ -269,13 +323,8 @@ def generate_pdf_report(client, advisor):
             "cds":           "CERTIFICATES OF DEPOSIT",
         }
 
-        tab_order = [
-            "equity_etfs", "growth_stocks",
-            "bond_etfs", "mutual_funds", "cds"
-        ]
-
-        for cat_key in tab_order:
-            cat_instr = instruments.get(cat_key, [])
+        for cat_key in cat_order:
+            cat_instr = active_instruments(cat_key)
             if not cat_instr:
                 continue
 
@@ -314,11 +363,11 @@ def generate_pdf_report(client, advisor):
 
             for inst in cat_instr:
                 pct    = inst.get("allocation_pct", 0) or 0
-                dollar = inst.get("dollar_amount", 0) or (pct/100)*client["amount"]
+                dollar = round((pct / 100) * amount)
                 instr_rows.append([
                     Paragraph(escape(safe(inst.get("ticker"), "")), s_bold),
                     Paragraph(escape(safe(inst.get("name"), "")), s_body),
-                    Paragraph(f"{pct}%", ParagraphStyle("IP", fontSize=9,
+                    Paragraph(f"{fmt_pct(pct)}%", ParagraphStyle("IP", fontSize=9,
                         textColor=NAVY, fontName="Helvetica-Bold",
                         alignment=TA_CENTER)),
                     Paragraph(f"${dollar:,.0f}", ParagraphStyle("IA", fontSize=9,
@@ -402,20 +451,9 @@ def generate_pdf_report(client, advisor):
         section_bar("ADVISOR CONFIRMATION"),
         Spacer(1, 6),
         st,
-        Spacer(1, 18),
     ]))
 
-    # ── 8. Footer ──────────────────────────────────────────
-    content.append(HRFlowable(width="100%", thickness=1,
-        color=GOLD, spaceAfter=6))
-    content.append(Paragraph(
-        "IMPORTANT DISCLOSURE: This report was prepared using AdvisorNest "
-        "decision support software for licensed financial advisors only. "
-        "All recommendations require advisor review and client suitability "
-        "assessment before implementation. This document does not constitute "
-        "financial advice. AdvisorNest 2026",
-        s_disclaimer))
-
-    doc.build(content)
+    # The disclosure is drawn on every page by draw_footer (see above).
+    doc.build(content, onFirstPage=draw_footer, onLaterPages=draw_footer)
     buffer.seek(0)
     return buffer

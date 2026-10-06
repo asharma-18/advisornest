@@ -47,6 +47,14 @@
     .instr-row-ticker { font-size: 0.875rem; font-weight: 700; color: var(--text-primary); min-width: 55px; }
     .instr-row-name { flex: 1; font-size: 0.8rem; color: var(--text-muted); }
     .instr-row-pct { font-size: 0.875rem; font-weight: 700; color: var(--navy); min-width: 36px; text-align: right; }
+    .instr-pct-input {
+        width: 70px; height: 30px; background: white;
+        border: 1.5px solid var(--border); border-radius: 6px; padding: 0 6px;
+        font-size: 0.875rem; font-weight: 700; color: var(--navy);
+        font-family: var(--font-body); text-align: right; outline: none;
+    }
+    .instr-pct-input:focus { border-color: var(--navy); }
+    .instr-pct-sign { font-size: 0.875rem; font-weight: 700; color: var(--navy); }
     .instr-remove-btn {
         width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--border);
         background: white; color: var(--error); font-size: 0.9rem; cursor: pointer;
@@ -158,7 +166,10 @@
                 <div class="instr-row" id="instr-{{ key }}-{{ loop.index0 }}">
                     <div class="instr-row-ticker">{{ inst.ticker }}</div>
                     <div class="instr-row-name">{{ inst.name }}</div>
-                    <div class="instr-row-pct">{{ inst.allocation_pct }}%</div>
+                    <input type="number" class="instr-pct-input" min="0" max="100" step="any"
+                           value="{{ inst.allocation_pct }}"
+                           onchange="onInstrumentPctChange('{{ key }}', this)">
+                    <span class="instr-pct-sign">%</span>
                     <button class="instr-remove-btn" data-row="instr-{{ key }}-{{ loop.index0 }}"
                             data-category="{{ key }}" data-ticker="{{ inst.ticker }}">×</button>
                 </div>
@@ -220,15 +231,164 @@ window.OPTION_NAME = {{ option.name | tojson }};
 const tickerCache = {};
 let searchTimer = null;
 
+const ALLOC_CATEGORIES = {
+    equity_etfs:   'Equity ETFs',
+    growth_stocks: 'Growth Stocks',
+    bond_etfs:     'Bond ETFs',
+    mutual_funds:  'Mutual Funds',
+    cds:           'CDs'
+};
+
+window.INSTR_BASE = {};
+
+function fmtPct(v) {
+    return String(Math.round((parseFloat(v) || 0) * 100) / 100);
+}
+
+function getInstrumentList(category) {
+    return window.CURRENT_INSTRUMENTS[category] || [];
+}
+
+function sumInstruments(category) {
+    return getInstrumentList(category).reduce(function(s, i) {
+        return s + (parseFloat(i.allocation_pct) || 0);
+    }, 0);
+}
+
+function getBase(category) {
+    if (!window.INSTR_BASE[category]) {
+        window.INSTR_BASE[category] = getInstrumentList(category).map(function(i) {
+            return parseFloat(i.allocation_pct) || 0;
+        });
+    }
+    return window.INSTR_BASE[category];
+}
+
+function resetBase(category) {
+    delete window.INSTR_BASE[category];
+}
+
+// Rescales a category's instruments to add up to targetPct, keeping their
+// relative weights. Works from a snapshot so dragging back and forth never drifts.
+function rescaleInstruments(category, targetPct) {
+    const list = getInstrumentList(category);
+    if (!list.length) return;
+
+    let base = getBase(category);
+    if (base.length !== list.length) {
+        resetBase(category);
+        base = getBase(category);
+    }
+    const baseSum = base.reduce(function(s, v) { return s + v; }, 0);
+    if (baseSum <= 0) return;
+
+    const amount = window.CLIENT_PROFILE.amount || 0;
+    let running = 0;
+    list.forEach(function(inst, idx) {
+        let pct;
+        if (idx === list.length - 1) {
+            pct = targetPct - running;
+        } else {
+            pct = Math.min(Math.round(base[idx] * targetPct / baseSum), targetPct - running);
+        }
+        pct = Math.max(pct, 0);
+        running += pct;
+        inst.allocation_pct = pct;
+        inst.dollar_amount  = Math.round((pct / 100) * amount);
+    });
+
+    const container = document.getElementById('instr-list-' + category);
+    if (container) {
+        container.querySelectorAll('.instr-row').forEach(function(row, idx) {
+            const box = row.querySelector('.instr-pct-input');
+            if (box && list[idx]) box.value = list[idx].allocation_pct;
+        });
+    }
+}
+
+function setSliderDisplay(category) {
+    const v = window.CURRENT_ALLOCATION[category] || 0;
+    const slider = document.getElementById('slider-' + category);
+    const label  = document.getElementById('sliderval-' + category);
+    if (slider) slider.value = v;
+    if (label)  label.textContent = fmtPct(v) + '%';
+}
+
+function refreshTotal() {
+    const total = Object.values(window.CURRENT_ALLOCATION).reduce(function(a, b) { return a + b; }, 0);
+    const totalEl = document.getElementById('alloc-total');
+    totalEl.textContent = fmtPct(total) + '%';
+    totalEl.className = 'alloc-total-val ' + (Math.abs(total - 100) < 0.01 ? 'ok' : 'over');
+}
+
+// An instrument was added, removed or edited: its category follows.
+function syncCategoryFromInstruments(category) {
+    window.CURRENT_ALLOCATION[category] =
+        Math.round(sumInstruments(category) * 100) / 100;
+    resetBase(category);
+    setSliderDisplay(category);
+    refreshTotal();
+    scheduleNoteRegeneration();
+}
+
+function onInstrumentPctChange(category, input) {
+    const container = document.getElementById('instr-list-' + category);
+    const rows = container ? Array.prototype.slice.call(container.querySelectorAll('.instr-row')) : [];
+    const idx  = rows.indexOf(input.closest('.instr-row'));
+    const list = getInstrumentList(category);
+    if (idx < 0 || !list[idx]) return;
+
+    let pct = parseFloat(input.value);
+    if (isNaN(pct) || pct < 0) pct = 0;
+    if (pct > 100) pct = 100;
+    input.value = pct;
+
+    list[idx].allocation_pct = pct;
+    list[idx].dollar_amount  = Math.round((pct / 100) * (window.CLIENT_PROFILE.amount || 0));
+    syncCategoryFromInstruments(category);
+}
+
 function onSliderChange(key, value) {
     value = parseInt(value);
     window.CURRENT_ALLOCATION[key] = value;
-    document.getElementById('sliderval-' + key).textContent = value + '%';
+    const label = document.getElementById('sliderval-' + key);
+    if (label) label.textContent = value + '%';
 
-    const total = Object.values(window.CURRENT_ALLOCATION).reduce((a, b) => a + b, 0);
-    const totalEl = document.getElementById('alloc-total');
-    totalEl.textContent = total + '%';
-    totalEl.className = 'alloc-total-val ' + (total === 100 ? 'ok' : 'over');
+    // Instruments in this category follow the slider
+    rescaleInstruments(key, value);
+    refreshTotal();
+    scheduleNoteRegeneration();
+}
+
+function getSaveProblems() {
+    const alloc = window.CURRENT_ALLOCATION;
+    const problems = [];
+    const total = Object.values(alloc).reduce(function(a, b) { return a + b; }, 0);
+    if (Math.abs(total - 100) > 0.01) {
+        problems.push('Total allocation is ' + fmtPct(total) + '%. It must equal 100%.');
+    }
+    Object.keys(ALLOC_CATEGORIES).forEach(function(cat) {
+        const target = alloc[cat] || 0;
+        const active = getInstrumentList(cat).filter(function(i) {
+            return (parseFloat(i.allocation_pct) || 0) > 0;
+        });
+        if (target > 0 && active.length === 0) {
+            problems.push(ALLOC_CATEGORIES[cat] + ' is ' + fmtPct(target) +
+                '% but has no instruments. Add one, or set it to 0%.');
+        }
+    });
+    return problems;
+}
+
+// Drops instruments that were scaled down to 0% before saving.
+function cleanInstruments(instr) {
+    const out = {};
+    Object.keys(instr || {}).forEach(function(cat) {
+        out[cat] = (instr[cat] || []).filter(function(i) {
+            return (parseFloat(i.allocation_pct) || 0) > 0;
+        });
+    });
+    return out;
 }
 
 function showEditorTab(tabId, button) {
@@ -310,7 +470,7 @@ function addInstrument(category) {
     const feedback = document.getElementById('feedback-' + category);
 
     const ticker = tickerInput.value.trim().toUpperCase();
-    const pct = parseInt(pctInput.value);
+    const pct = parseFloat(pctInput.value);
 
     if (!ticker) {
         feedback.textContent = 'Please enter a ticker symbol';
@@ -338,9 +498,15 @@ function addInstrument(category) {
     row.className = 'instr-row';
     row.id = rowId;
     row.innerHTML =
-        '<div class="instr-row-ticker">' + ticker + '</div>' +
-        '<div class="instr-row-name">' + name + '</div>' +
-        '<div class="instr-row-pct">' + pct + '%</div>';
+        '<div class="instr-row-ticker"></div>' +
+        '<div class="instr-row-name"></div>' +
+        '<input type="number" class="instr-pct-input" min="0" max="100" step="any" value="' + pct + '">' +
+        '<span class="instr-pct-sign">%</span>';
+    row.querySelector('.instr-row-ticker').textContent = ticker;
+    row.querySelector('.instr-row-name').textContent = name;
+    row.querySelector('.instr-pct-input').addEventListener('change', function() {
+        onInstrumentPctChange(category, this);
+    });
     const removeBtn = document.createElement('button');
     removeBtn.className = 'instr-remove-btn';
     removeBtn.textContent = '×';
@@ -362,22 +528,22 @@ function addInstrument(category) {
     feedback.textContent = '✓ ' + ticker + ' added';
     feedback.className = 'ticker-feedback valid';
 
-    scheduleNoteRegeneration();
+    syncCategoryFromInstruments(category);
 }
 
 document.addEventListener('click', function(e) {
     const btn = e.target.closest('.instr-remove-btn');
-    if (btn) {
-        const row = document.getElementById(btn.dataset.row);
-        if (row) row.remove();
-        const category = btn.dataset.category;
-        const ticker = btn.dataset.ticker;
-        if (window.CURRENT_INSTRUMENTS[category]) {
-            window.CURRENT_INSTRUMENTS[category] = window.CURRENT_INSTRUMENTS[category]
-                .filter(inst => inst.ticker !== ticker);
-        }
-        scheduleNoteRegeneration();
+    if (!btn) return;
+    const row = document.getElementById(btn.dataset.row);
+    const category = btn.dataset.category;
+    const container = document.getElementById('instr-list-' + category);
+    const rows = container ? Array.prototype.slice.call(container.querySelectorAll('.instr-row')) : [];
+    const idx = rows.indexOf(row);
+    if (idx >= 0 && window.CURRENT_INSTRUMENTS[category]) {
+        window.CURRENT_INSTRUMENTS[category].splice(idx, 1);
     }
+    if (row) row.remove();
+    syncCategoryFromInstruments(category);
 });
 
 let noteRegenTimer = null;
@@ -389,11 +555,12 @@ function scheduleNoteRegeneration() {
 }
 
 function saveEdit() {
-    const total = Object.values(window.CURRENT_ALLOCATION).reduce((a, b) => a + b, 0);
-    if (total !== 100) {
-        alert('Total allocation must equal 100% before saving. Currently: ' + total + '%');
+    const problems = getSaveProblems();
+    if (problems.length) {
+        alert('Please fix the following before saving:\n\n' + problems.join('\n'));
         return;
     }
+    window.CURRENT_INSTRUMENTS = cleanInstruments(window.CURRENT_INSTRUMENTS);
 
     const saveBtn = document.getElementById('save-btn');
     saveBtn.disabled = true;

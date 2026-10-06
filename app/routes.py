@@ -219,6 +219,88 @@ def _get_cached_feed(cache_key, fetch_fn):
             return cached["items"], cached["timestamp"]
 
         raise
+# ── Allocation consistency helpers ───────────────────────
+CATEGORY_KEYS = ["equity_etfs", "growth_stocks", "bond_etfs", "mutual_funds", "cds"]
+
+
+def _num(value, default=0.0):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _clean_instruments(instruments):
+    """Keep only valid instrument rows and normalise their numbers."""
+    cleaned = {}
+    if not isinstance(instruments, dict):
+        return {k: [] for k in CATEGORY_KEYS}
+    for cat in CATEGORY_KEYS:
+        rows = []
+        for inst in (instruments.get(cat) or []):
+            if not isinstance(inst, dict):
+                continue
+            ticker = str(inst.get("ticker") or "").strip().upper()
+            pct = round(_num(inst.get("allocation_pct")), 2)
+            if not ticker or pct <= 0:
+                continue
+            row = dict(inst)
+            row["ticker"] = ticker
+            row["allocation_pct"] = pct
+            rows.append(row)
+        cleaned[cat] = rows
+    return cleaned
+
+def _fit_instruments_to_allocation(instruments, allocation):
+    """Scale each category's instruments so they add up to the category total."""
+    for cat in CATEGORY_KEYS:
+        rows = instruments.get(cat) or []
+        target = _num((allocation or {}).get(cat))
+        current = sum(_num(r.get("allocation_pct")) for r in rows)
+        if not rows or current <= 0 or target <= 0 or abs(current - target) < 0.01:
+            continue
+        running = 0.0
+        for i, r in enumerate(rows):
+            if i == len(rows) - 1:
+                pct = round(target - running, 2)
+            else:
+                pct = round(_num(r.get("allocation_pct")) * target / current, 2)
+            r["allocation_pct"] = max(pct, 0)
+            running += pct
+    return instruments
+
+def _reconcile_allocation(allocation, instruments, amount=None):
+    """
+    Instruments are the source of truth for each category percentage.
+    A category with instruments takes the sum of those instruments.
+    A category with none keeps the allocation value it was sent with.
+    Returns (allocation, problems). Problems means do not save.
+    """
+    allocation = allocation if isinstance(allocation, dict) else {}
+    final = {}
+    for cat in CATEGORY_KEYS:
+        rows = instruments.get(cat) or []
+        if rows:
+            final[cat] = round(sum(_num(r.get("allocation_pct")) for r in rows), 2)
+        else:
+            final[cat] = round(_num(allocation.get(cat)), 2)
+
+    problems = []
+    for cat, val in final.items():
+        if val < 0:
+            problems.append("Percentages cannot be negative.")
+            break
+    total = round(sum(final.values()), 2)
+    if abs(total - 100) > 0.01:
+        problems.append(f"Allocation totals {total:g}%. It must equal 100% before saving.")
+
+    if amount:
+        for cat in CATEGORY_KEYS:
+            for r in instruments.get(cat) or []:
+                r["dollar_amount"] = round(_num(r.get("allocation_pct")) / 100 * _num(amount))
+    return final, problems
+
+
 main = Blueprint("main", __name__)
 
 
@@ -644,13 +726,7 @@ def portal():
             }
             opt_score = portfolio_score(risk, horizon, age, opt_alloc)
             opt["score"] = opt_score
-            if opt_score >= 80:
-                opt["score_color"], opt["score_label"] = "success", "Excellent"
-            elif opt_score >= 60:
-                opt["score_color"], opt["score_label"] = "warning", "Moderate"
-            else:
-                opt["score_color"], opt["score_label"] = "error", "Needs Review"
-
+            opt["score_color"], opt["score_label"] = "neutral", ""
         recommended = next(
             (o for o in ai_options if o.get("recommended")),
             ai_options[0] if ai_options else None
@@ -754,44 +830,79 @@ def save_client_route():
     age     = request.form.get("age")
     amount  = request.form.get("amount")
     horizon = request.form.get("horizon")
-    score   = request.form.get("score")
+
+    try:
+        age_val     = int(age) if age else 0
+        amount_val  = int(float(amount)) if amount else 0
+        horizon_val = int(horizon) if horizon else 0
+        allocation  = json.loads(request.form.get("allocation", "{}"))
+        flags       = json.loads(request.form.get("flags", "[]"))
+        ai_data_raw = request.form.get("ai_data", "{}")
+        ai_data     = json.loads(ai_data_raw) if ai_data_raw else {}
+    except Exception:
+        flash("Could not read the recommendation. Please try again.", "error")
+        return redirect(url_for("main.portal"))
+
+    risk            = request.form.get("risk", "")
+    selected_option = request.form.get("selected_option", "")
+
+    # Find the option the advisor selected inside the submitted data.
+    selected_opt = None
+    if ai_data and ai_data.get("options"):
+        selected_id = selected_option[0] if selected_option else "C"
+        selected_opt = next(
+            (o for o in ai_data["options"] if o.get("id") == selected_id),
+            ai_data["options"][0]
+        )
+    # An option saved as generated (not customized) can have instrument
+    # percentages that are a little off its category totals. Fit them to
+    # the category totals first. Customized options are already in sync.
+    if selected_opt is not None and "(Advisor Customized)" not in selected_option:
+        selected_opt["instruments"] = _fit_instruments_to_allocation(
+            _clean_instruments(selected_opt.get("instruments", {})),
+            selected_opt.get("allocation") or allocation)
+        allocation = selected_opt.get("allocation") or allocation
+    # Instruments decide the category percentages. Re-check on the server
+    # so the saved record and the PDF can never disagree.
+    instruments = _clean_instruments(
+        (selected_opt or {}).get("instruments", {}))
+    allocation, problems = _reconcile_allocation(
+        allocation, instruments, amount_val)
+    if problems:
+        flash(" ".join(problems), "error")
+        return redirect(url_for("main.portal"))
+
+    if selected_opt is not None:
+        selected_opt["allocation"]  = allocation
+        selected_opt["instruments"] = instruments
+
+    # Score is always calculated here, never trusted from the browser.
+    score = portfolio_score(risk, horizon_val, age_val, allocation)
 
     client_data = {
         "client_name":      request.form.get("client_name", ""),
-        "age":              int(age) if age else 0,
+        "age":              age_val,
         "life_stage":       request.form.get("life_stage", ""),
-        "amount":           int(float(amount)) if amount else 0,
-        "risk":             request.form.get("risk", ""),
-        "horizon":          int(horizon) if horizon else 0,
-        "allocation":       json.loads(request.form.get("allocation", "{}")),
+        "amount":           amount_val,
+        "risk":             risk,
+        "horizon":          horizon_val,
+        "allocation":       allocation,
         "score":            int(score) if score else 0,
-        "flags":            json.loads(request.form.get("flags", "[]")),
+        "flags":            flags,
         "suitability_note": request.form.get("suitability_note", ""),
-        "selected_option":  request.form.get("selected_option", ""),
+        "selected_option":  selected_option,
     }
     result = save_client(advisor_id, client_data)
 
     if result["success"]:
-        try:
-            ai_data_raw = request.form.get("ai_data", "{}")
-            ai_data = json.loads(ai_data_raw) if ai_data_raw else {}
-        except Exception:
-            ai_data = {}
-
         # Fetch original prices for drift tracking
         instrument_prices = {}
         try:
-            if ai_data and ai_data.get("options"):
-                selected_id = client_data.get("selected_option", "C")[0]
-                selected_opt = next(
-                    (o for o in ai_data["options"] if o.get("id") == selected_id),
-                    ai_data["options"][0] if ai_data["options"] else None
+            if selected_opt:
+                from market_data import fetch_instrument_prices
+                instrument_prices = fetch_instrument_prices(
+                    selected_opt.get("instruments", {})
                 )
-                if selected_opt:
-                    from market_data import fetch_instrument_prices
-                    instrument_prices = fetch_instrument_prices(
-                        selected_opt.get("instruments", {})
-                    )
         except Exception as e:
             print(f"Price fetch error: {str(e)}")
 
@@ -886,6 +997,13 @@ def save_edited_client(client_id):
         allocation = json.loads(request.form.get("allocation", "{}"))
         instruments = json.loads(request.form.get("instruments", "{}"))
         suitability_note = request.form.get("suitability_note", "")
+
+        instruments = _clean_instruments(instruments)
+        allocation, problems = _reconcile_allocation(
+            allocation, instruments, client.get("amount"))
+        if problems:
+            flash(" ".join(problems), "error")
+            return redirect(url_for("main.edit_client", client_id=client_id))
 
         score = portfolio_score(client["risk"], client["horizon"], client["age"], allocation)
         flags = get_advisor_flags(client["risk"], client["horizon"], client["age"])
@@ -988,7 +1106,6 @@ def generate_talking_points():
         risk        = data.get("risk", "")
         horizon     = data.get("horizon", 0)
         amount      = data.get("amount", 0)
-        score       = data.get("score", 0)
         last_note   = data.get("last_note", "")
 
         from openai import OpenAI
@@ -999,7 +1116,7 @@ def generate_talking_points():
 
 CLIENT: {client_name}
 Age: {age} | Life Stage: {life_stage} | Risk: {risk}
-Investment: ${amount:,} | Horizon: {horizon} years | Score: {score}/100
+Investment: ${amount:,} | Horizon: {horizon} years
 Last meeting notes: {last_note if last_note else 'No previous notes'}
 
 Generate exactly 4 specific conversation starters for this client meeting.

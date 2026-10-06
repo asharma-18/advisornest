@@ -413,7 +413,7 @@ def build_rule_based_option(option_id, client_name, age, risk, horizon, amount, 
         "cds":           midpoint(ranges["cds"]),
     }
 
-    return {
+    option = {
         "id": option_id,
         "name": opt["name"],
         "tagline": opt["tagline"],
@@ -431,6 +431,7 @@ def build_rule_based_option(option_id, client_name, age, risk, horizon, amount, 
         ],
         "flags": ["Rule-based allocation — AI-generated detail was unavailable for this option"]
     }
+    return normalize_category_totals(option)
 
 
 def generate_ai_recommendation(
